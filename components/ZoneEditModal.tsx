@@ -109,22 +109,22 @@ const ZoneEditModal: React.FC<ZoneEditModalProps> = ({ isOpen, onClose, onSave, 
           </div>
 
           {/* Source List */}
-          <div className="border border-dashed border-deep-200 rounded-md bg-deep-50/50 min-h-[60px] max-h-[200px] overflow-y-auto">
+          <div className="border border-dashed border-deep-200 rounded-md bg-deep-50/50 min-h-[60px] max-h-[240px] overflow-y-auto p-2">
             {sources.length === 0 ? (
               <div className="flex items-center justify-center h-full py-4">
                  <span className="text-xs text-deep-300 italic">{t('noSourcesAdded')}</span>
               </div>
             ) : (
-              <ul className="divide-y divide-deep-200/50">
+              <ul className="space-y-2">
                 {sources.map((source, index) => (
-                  <li key={index} className="flex items-center justify-between px-4 py-2 hover:bg-deep-100/50 transition-colors">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-deep-500">{source.name}</span>
-                      <span className="text-xs text-deep-300 truncate max-w-[200px]">{source.url}</span>
+                  <li key={index} className="flex items-center justify-between px-3 py-2 bg-white rounded-md shadow-sm border border-deep-100">
+                    <div className="flex flex-col overflow-hidden mr-2">
+                      <span className="text-sm font-bold text-deep-500 truncate" title={source.name}>{source.name}</span>
+                      <span className="text-xs text-deep-300 truncate font-mono" title={source.url}>{source.url}</span>
                     </div>
                     <button
                       onClick={() => removeSource(index)}
-                      className="text-deep-300 hover:text-red-500 focus:outline-none p-1"
+                      className="text-deep-300 hover:text-red-500 focus:outline-none p-1 transition-colors"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />

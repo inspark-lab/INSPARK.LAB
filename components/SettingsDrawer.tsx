@@ -1,9 +1,6 @@
 
 import React, { useState } from 'react';
 import { NotificationSettings, ZoneSource } from '../types';
-import { generateDailyBriefing } from '../services/geminiService';
-import Modal from './Modal';
-import ReactMarkdown from 'react-markdown';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SettingsDrawerProps {
@@ -17,20 +14,10 @@ interface SettingsDrawerProps {
 const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ isOpen, onClose, settings, onSaveSettings, zones }) => {
   const { t } = useLanguage();
   const [localSettings, setLocalSettings] = useState(settings);
-  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
-  const [previewContent, setPreviewContent] = useState<string | null>(null);
 
   const handleSave = () => {
     onSaveSettings(localSettings);
     onClose();
-  };
-
-  const handleTestNotification = async () => {
-    setIsGeneratingPreview(true);
-    setPreviewContent(null);
-    const content = await generateDailyBriefing(zones);
-    setPreviewContent(content);
-    setIsGeneratingPreview(false);
   };
 
   if (!isOpen) return null;
@@ -54,10 +41,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ isOpen, onClose, settin
           </div>
 
           {/* Body */}
-          <div className="flex-1 py-6 px-6 overflow-y-auto space-y-8">
+          <div className="flex-1 py-6 px-6 overflow-y-auto flex flex-col">
             
             {/* Section: Daily Digest Settings */}
-            <div>
+            <div className="mb-8">
               <h3 className="text-sm font-medium text-deep-400 uppercase tracking-wider mb-4">{t('schedule')}</h3>
               <div className="space-y-6">
                 
@@ -103,19 +90,24 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ isOpen, onClose, settin
               </div>
             </div>
 
-            {/* Section: Test */}
-            <div className="pt-6 border-t border-deep-200">
-               <h3 className="text-sm font-medium text-deep-400 uppercase tracking-wider mb-4">{t('testFunc')}</h3>
-               <button
-                 onClick={handleTestNotification}
-                 disabled={isGeneratingPreview}
-                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-deep-100 bg-deep-400 hover:bg-deep-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-deep-400 disabled:opacity-50 transition-colors"
-               >
-                 {isGeneratingPreview ? t('generating') : t('simulateBtn')}
-               </button>
-               <p className="mt-2 text-xs text-deep-300">
-                 {t('testDesc')}
-               </p>
+            {/* Branding Section (Moved to bottom) */}
+            <div className="mt-auto pt-8">
+               <div className="bg-deep-500 rounded-lg p-5 shadow-md border border-deep-400">
+                  <p className="text-xs text-deep-200 italic mb-4 font-light leading-relaxed">
+                    {t('footerSlogan')}
+                  </p>
+                  <a 
+                    href="https://insparklab.com" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sm font-medium text-deep-100 hover:text-white transition-colors flex items-center gap-2"
+                  >
+                    {t('officialWebsite')}
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-deep-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+               </div>
             </div>
 
           </div>
@@ -137,17 +129,6 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ isOpen, onClose, settin
           </div>
         </div>
       </div>
-      
-      {/* Preview Modal */}
-      <Modal 
-        isOpen={!!previewContent} 
-        onClose={() => setPreviewContent(null)}
-        title={t('previewTitle')}
-      >
-        <div className="prose prose-sm max-w-none prose-headings:text-deep-500 prose-p:text-deep-300">
-           <ReactMarkdown>{previewContent || ''}</ReactMarkdown>
-        </div>
-      </Modal>
     </div>
   );
 };

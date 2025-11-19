@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { NewsZone, NotificationSettings, ZoneSource } from './types';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { NewsZone, NotificationSettings, ZoneSource, Article } from './types';
 import NavigationSidebar from './components/NavigationSidebar';
 import NewsFeed from './components/NewsFeed';
 import SettingsDrawer from './components/SettingsDrawer';
@@ -271,28 +271,71 @@ function App() {
   };
 
   // Aggregation Logic for "All News" Section
-  const getAggregatedArticles = () => {
+  // Memoized to prevent reshuffling on every render and implement pinning logic
+  const allArticles = useMemo(() => {
+    // 1. Flatten all chunks from all zones
     const allChunks = zones.flatMap(z => z.articles || []);
+
+    // 2. Sort by date (Freshest first)
+    allChunks.sort((a, b) => {
+      const dateA = a.meta?.publishedAt ? new Date(a.meta.publishedAt).getTime() : 0;
+      const dateB = b.meta?.publishedAt ? new Date(b.meta.publishedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    
     const articles = mapChunksToArticles(allChunks);
     
-    // CONTENT PRIORITIZATION: Pin INSPARK LAB articles to the top
-    const pinnedArticles = articles.filter(a => 
-      a.source.toUpperCase().includes('INSPARK') || 
-      a.url.includes('insparklab.com')
+    // Separation: INSpark vs Others
+    const insparkArticles = articles.filter(a => 
+      (a.source && a.source.toUpperCase().includes('INSPARK')) || 
+      (a.url && a.url.includes('insparklab.com'))
     );
+
+    // Final Construction List
+    const finalArticles: Article[] = [];
+    const usedIds = new Set<string>();
+
+    const addArticle = (art: Article) => {
+        if (!usedIds.has(art.id)) {
+            finalArticles.push(art);
+            usedIds.add(art.id);
+        }
+    };
+
+    // --- TIER 1: HERO (6 Items) ---
     
-    const otherArticles = articles.filter(a => 
-      !a.source.toUpperCase().includes('INSPARK') && 
-      !a.url.includes('insparklab.com')
-    );
+    // Slot 1: Reserved for Newest INSpark Article
+    if (insparkArticles.length > 0) {
+        addArticle(insparkArticles[0]);
+    }
 
-    // Sort others by random/shuffle or date
-    otherArticles.sort(() => Math.random() - 0.5);
+    // Slots 2-6: Fill with freshest mix (skipping used)
+    for (const art of articles) {
+        if (finalArticles.length >= 6) break;
+        addArticle(art);
+    }
 
-    return [...pinnedArticles, ...otherArticles];
-  };
+    // --- TIER 2: FEATURED (4 Items) - Starts at index 6 ---
+    
+    // Slot 7 (Featured #1): Reserved for NEXT available INSpark Article
+    const nextInspark = insparkArticles.find(a => !usedIds.has(a.id));
+    if (nextInspark) {
+        addArticle(nextInspark);
+    }
 
-  const allArticles = getAggregatedArticles();
+    // Slots 8-10: Fill with freshest mix (skipping used)
+    for (const art of articles) {
+        if (finalArticles.length >= 10) break;
+        addArticle(art);
+    }
+
+    // --- TIER 3: REST ---
+    for (const art of articles) {
+        addArticle(art);
+    }
+    
+    return finalArticles;
+  }, [zones]); 
   
   // 3-Tier Slicing
   const heroArticles = allArticles.slice(0, 6); // Tier 1: Top 6
