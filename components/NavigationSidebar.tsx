@@ -25,24 +25,33 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   const { t } = useLanguage();
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
 
-  const handleDragStart = (index: number) => {
+  const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedItemIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    // Optional: Transparent drag image or custom styling could be set here
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-  };
+    e.preventDefault(); // Necessary to allow dropping/movement
 
-  const handleDrop = (index: number) => {
-    if (draggedItemIndex === null || draggedItemIndex === index) return;
+    if (draggedItemIndex === null) return;
+    
+    // Live Sort: Only trigger update if the item has moved to a new index
+    if (draggedItemIndex !== index) {
+      const newZones = [...zones];
+      const draggedItem = newZones[draggedItemIndex];
+      
+      // Remove from old position
+      newZones.splice(draggedItemIndex, 1);
+      // Insert at new position
+      newZones.splice(index, 0, draggedItem);
 
-    const newZones = [...zones];
-    const draggedItem = newZones[draggedItemIndex];
-    newZones.splice(draggedItemIndex, 1);
-    newZones.splice(index, 0, draggedItem);
-
-    onReorderZones(newZones);
-    setDraggedItemIndex(null);
+      // Update parent state immediately
+      onReorderZones(newZones);
+      
+      // Update local tracking index to match new position
+      setDraggedItemIndex(index);
+    }
   };
 
   const handleDragEnd = () => {
@@ -75,17 +84,20 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
           {zones.map((zone, index) => (
             <li 
               key={zone.id} 
-              className={`group relative flex items-center rounded-md transition-colors ${
-                 draggedItemIndex === index ? 'opacity-50 bg-deep-200/30' : ''
+              className={`group relative flex items-center rounded-md transition-all duration-300 ease-in-out transform ${
+                 draggedItemIndex === index 
+                   ? 'opacity-50 scale-95 bg-deep-100 shadow-inner' 
+                   : 'hover:translate-x-1'
               }`}
               draggable
-              onDragStart={() => handleDragStart(index)}
+              onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}
-              onDrop={() => handleDrop(index)}
               onDragEnd={handleDragEnd}
             >
               {/* Drag Handle */}
-              <div className="cursor-move p-2 text-deep-200 hover:text-deep-400 opacity-0 group-hover:opacity-100 transition-opacity absolute left-0 z-10">
+              <div className={`cursor-move p-2 text-deep-200 hover:text-deep-400 transition-opacity absolute left-0 z-10 ${
+                 draggedItemIndex === index ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+              }`}>
                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M7 2a2 2 0 10-.001 4.001A2 2 0 007 2zm0 6a2 2 0 10-.001 4.001A2 2 0 007 8zm0 6a2 2 0 10-.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10-.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10-.001 4.001A2 2 0 0013 14z" />
                  </svg>

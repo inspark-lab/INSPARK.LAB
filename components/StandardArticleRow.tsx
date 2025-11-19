@@ -8,15 +8,23 @@ interface StandardArticleRowProps {
 
 const StandardArticleRow: React.FC<StandardArticleRowProps> = ({ article }) => {
   return (
-    <div className="flex justify-between gap-4 p-4 bg-white rounded-lg shadow-sm mb-4 group cursor-pointer hover:shadow-md transition-all duration-200 border border-deep-100/50">
+    <div className="flex justify-between gap-4 p-4 bg-white rounded-lg shadow-sm mb-4 group cursor-pointer hover:shadow-md transition-all duration-200 border border-deep-100/50 h-[130px] md:h-auto">
       {/* Left: Content */}
-      <div className="flex flex-col justify-between flex-1 pr-2">
-        <h3 className="text-base font-medium text-deep-500 leading-snug group-hover:text-deep-400 transition-colors line-clamp-2">
-           <a href={article.url} target="_blank" rel="noopener noreferrer">
-             {article.title}
-           </a>
-        </h3>
-        <div className="mt-2 flex items-center text-xs text-deep-300 gap-2">
+      <div className="flex flex-col justify-between flex-1 pr-2 overflow-hidden">
+        <div>
+          <h3 className="text-base font-bold text-deep-500 leading-tight group-hover:text-deep-400 transition-colors line-clamp-2 mb-1">
+             <a href={article.url} target="_blank" rel="noopener noreferrer">
+               {article.title}
+             </a>
+          </h3>
+          {article.snippet && (
+            <p className="text-sm text-deep-300 line-clamp-2 leading-relaxed mb-2 hidden sm:block">
+              {article.snippet}
+            </p>
+          )}
+        </div>
+        
+        <div className="flex items-center text-xs text-deep-300 gap-2 mt-auto">
            <span className="font-medium text-deep-400 truncate max-w-[100px]">{article.source}</span>
            <span className="text-deep-200">|</span>
            <span>{article.publishedAt}</span>
