@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { NewsZone } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -10,6 +10,7 @@ interface NavigationSidebarProps {
   onAddZone: () => void;
   onOpenSettings: () => void;
   onEditZone: (zone: NewsZone) => void;
+  onReorderZones: (zones: NewsZone[]) => void;
 }
 
 const NavigationSidebar: React.FC<NavigationSidebarProps> = ({ 
@@ -18,20 +19,81 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   onSelectZone, 
   onAddZone,
   onOpenSettings,
-  onEditZone
+  onEditZone,
+  onReorderZones
 }) => {
   const { t } = useLanguage();
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
+
+  const handleDragStart = (index: number) => {
+    setDraggedItemIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (index: number) => {
+    if (draggedItemIndex === null || draggedItemIndex === index) return;
+
+    const newZones = [...zones];
+    const draggedItem = newZones[draggedItemIndex];
+    newZones.splice(draggedItemIndex, 1);
+    newZones.splice(index, 0, draggedItem);
+
+    onReorderZones(newZones);
+    setDraggedItemIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItemIndex(null);
+  };
 
   return (
     <div className="h-full flex flex-col">
       <div className="mb-8">
-        <h2 className="text-xs font-bold text-deep-300 uppercase tracking-wider mb-4 px-2">{t('myZones')}</h2>
+        <div className="flex items-center justify-between px-2 mb-4">
+          <h2 className="text-xs font-bold text-deep-300 uppercase tracking-wider">{t('myZones')}</h2>
+        </div>
+        
+        {/* "All News" / Home Link */}
+        <button
+            onClick={() => onSelectZone(null)}
+            className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors mb-2 flex items-center gap-2 ${
+              activeZoneId === null
+                ? 'bg-deep-400 text-deep-100' 
+                : 'text-deep-400 hover:bg-deep-200/50 hover:text-deep-500'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 opacity-80" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+            </svg>
+            {t('home')}
+          </button>
+
         <ul className="space-y-1">
-          {zones.map(zone => (
-            <li key={zone.id} className="group relative">
+          {zones.map((zone, index) => (
+            <li 
+              key={zone.id} 
+              className={`group relative flex items-center rounded-md transition-colors ${
+                 draggedItemIndex === index ? 'opacity-50 bg-deep-200/30' : ''
+              }`}
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDrop={() => handleDrop(index)}
+              onDragEnd={handleDragEnd}
+            >
+              {/* Drag Handle */}
+              <div className="cursor-move p-2 text-deep-200 hover:text-deep-400 opacity-0 group-hover:opacity-100 transition-opacity absolute left-0 z-10">
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M7 2a2 2 0 10-.001 4.001A2 2 0 007 2zm0 6a2 2 0 10-.001 4.001A2 2 0 007 8zm0 6a2 2 0 10-.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10-.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10-.001 4.001A2 2 0 0013 14z" />
+                 </svg>
+              </div>
+
               <button
                 onClick={() => onSelectZone(zone.id)}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors pr-10 ${
+                className={`flex-1 text-left pl-8 pr-10 py-2 rounded-md text-sm font-medium transition-colors ${
                   activeZoneId === zone.id 
                     ? 'bg-deep-400 text-deep-100' 
                     : 'text-deep-400 hover:bg-deep-200/50 hover:text-deep-500'
@@ -39,6 +101,7 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
               >
                 {zone.title}
               </button>
+
               {/* Edit Button */}
               <button
                 onClick={(e) => {

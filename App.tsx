@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NewsZone, NotificationSettings, ZoneSource } from './types';
 import NavigationSidebar from './components/NavigationSidebar';
 import NewsFeed from './components/NewsFeed';
@@ -56,6 +56,9 @@ function App() {
   const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
   const [editingZone, setEditingZone] = useState<NewsZone | null>(null);
 
+  // Ref to disable scroll spy temporarily during click scrolling
+  const isClickScrolling = useRef(false);
+
   // Load Data
   useEffect(() => {
     const storedZones = localStorage.getItem('nexus_zones');
@@ -75,15 +78,15 @@ function App() {
           return z;
         });
         setZones(parsedZones);
-        if (parsedZones.length > 0) setActiveZoneId(parsedZones[0].id);
+        if (parsedZones.length > 0) setActiveZoneId(null); // Default to Home/All News on load
       } catch (e) {
         console.error("Failed to parse zones", e);
         setZones(INITIAL_ZONES);
-        setActiveZoneId(INITIAL_ZONES[0].id);
+        setActiveZoneId(null);
       }
     } else {
       setZones(INITIAL_ZONES);
-      setActiveZoneId(INITIAL_ZONES[0].id);
+      setActiveZoneId(null);
     }
 
     if (storedSettings) {
@@ -106,6 +109,47 @@ function App() {
     localStorage.setItem('nexus_settings', JSON.stringify(settings));
   }, [settings]);
 
+  // Scroll Spy Logic
+  useEffect(() => {
+    const observerOptions = {
+      root: null,
+      // Trigger when the element hits the top 20% of the screen
+      rootMargin: '-10% 0px -80% 0px', 
+      threshold: 0
+    };
+
+    const observerCallback: IntersectionObserverCallback = (entries) => {
+      if (isClickScrolling.current) return;
+
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const id = entry.target.id;
+          if (id === 'all-news-section') {
+            setActiveZoneId(null);
+          } else if (id.startsWith('zone-')) {
+             const zoneId = id.replace('zone-', '');
+             setActiveZoneId(zoneId);
+          }
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+
+    // Observe "All News" Section
+    const allNewsEl = document.getElementById('all-news-section');
+    if (allNewsEl) observer.observe(allNewsEl);
+
+    // Observe Individual Zones
+    zones.forEach(zone => {
+      const el = document.getElementById(`zone-${zone.id}`);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [zones]);
+
+
   // Handlers
   const updateZone = (id: string, data: Partial<NewsZone>) => {
     setZones(prev => prev.map(z => z.id === id ? { ...z, ...data } : z));
@@ -116,28 +160,37 @@ function App() {
       const newZones = zones.filter(z => z.id !== id);
       setZones(newZones);
       if (activeZoneId === id) {
-        setActiveZoneId(newZones.length > 0 ? newZones[0].id : null);
+        setActiveZoneId(null);
       }
     }
   };
 
+  const handleReorderZones = (newZones: NewsZone[]) => {
+    setZones(newZones);
+  };
+
   // Navigation Handler: Scroll to View
   const scrollToZone = (id: string | null) => {
+    // Disable scroll spy temporarily to prevent jitter/wrong highlighting during scroll
+    isClickScrolling.current = true;
     setActiveZoneId(id);
-    setIsMobileMenuOpen(false); // Close mobile menu on selection
+    setIsMobileMenuOpen(false); 
     
     if (!id) {
-      // Scroll to top for "All News" / Home
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
+    } else {
+      setTimeout(() => {
+        const element = document.getElementById(`zone-${id}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 50);
     }
-    // Delay slightly to allow DOM update if needed (though content is statically rendered now)
+
+    // Re-enable scroll spy after animation
     setTimeout(() => {
-      const element = document.getElementById(`zone-${id}`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 50);
+      isClickScrolling.current = false;
+    }, 1000);
   };
 
   const handleOpenAddZone = () => {
@@ -172,6 +225,7 @@ function App() {
       };
       const newZones = [...zones, newZone];
       setZones(newZones);
+      // Timeout to allow DOM render before scroll
       setTimeout(() => scrollToZone(newZone.id), 100);
     }
     setIsZoneModalOpen(false);
@@ -233,6 +287,7 @@ function App() {
                   setIsMobileMenuOpen(false);
                 }}
                 onEditZone={handleOpenEditZone}
+                onReorderZones={handleReorderZones}
               />
             </div>
           </div>
@@ -286,47 +341,51 @@ function App() {
               onAddZone={handleOpenAddZone}
               onOpenSettings={() => setIsSettingsOpen(true)}
               onEditZone={handleOpenEditZone}
+              onReorderZones={handleReorderZones}
             />
           </aside>
 
           {/* Center Column: Content (10 cols on Desktop, 1 col on Mobile) */}
           <main className="lg:col-span-10 min-h-[600px]">
              
-             {/* --- TIER 1: Hero Carousel --- */}
-             {heroArticles.length > 0 && (
-               <div className="mb-8 md:mb-12">
-                  <HeroCarousel articles={heroArticles} />
-               </div>
-             )}
+             {/* ALL NEWS SECTION WRAPPER (Observed by Scroll Spy) */}
+             <div id="all-news-section" className="scroll-mt-28">
+               {/* --- TIER 1: Hero Carousel --- */}
+               {heroArticles.length > 0 && (
+                 <div className="mb-8 md:mb-12">
+                    <HeroCarousel articles={heroArticles} />
+                 </div>
+               )}
 
-             {/* --- TIER 2: Featured Grid (4 Boxes) --- */}
-             {featuredArticles.length > 0 && (
-               <div className="mb-12">
-                  <h2 className="text-lg font-bold text-deep-500 border-b border-deep-200 pb-2 mb-6 uppercase tracking-wide">
-                    {t('featured')}
-                  </h2>
-                  {/* Mobile: 1 col, Desktop: 4 cols */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                     {featuredArticles.map(article => (
-                       <FeaturedBoxCard key={article.id} article={article} />
-                     ))}
-                  </div>
-               </div>
-             )}
+               {/* --- TIER 2: Featured Grid (4 Boxes) --- */}
+               {featuredArticles.length > 0 && (
+                 <div className="mb-12">
+                    <h2 className="text-lg font-bold text-deep-500 border-b border-deep-200 pb-2 mb-6 uppercase tracking-wide">
+                      {t('featured')}
+                    </h2>
+                    {/* Mobile: 1 col, Desktop: 4 cols */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                       {featuredArticles.map(article => (
+                         <FeaturedBoxCard key={article.id} article={article} />
+                       ))}
+                    </div>
+                 </div>
+               )}
 
-             {/* --- TIER 3: Standard List (6 Lines) --- */}
-             {standardArticles.length > 0 && (
-               <div className="mb-16">
-                  <h2 className="text-lg font-bold text-deep-500 border-b border-deep-200 pb-2 mb-6 uppercase tracking-wide">
-                    {t('justIn')}
-                  </h2>
-                  <div className="flex flex-col">
-                    {standardArticles.map(article => (
-                      <StandardArticleRow key={article.id} article={article} />
-                    ))}
-                  </div>
-               </div>
-             )}
+               {/* --- TIER 3: Standard List (6 Lines) --- */}
+               {standardArticles.length > 0 && (
+                 <div className="mb-16">
+                    <h2 className="text-lg font-bold text-deep-500 border-b border-deep-200 pb-2 mb-6 uppercase tracking-wide">
+                      {t('justIn')}
+                    </h2>
+                    <div className="flex flex-col">
+                      {standardArticles.map(article => (
+                        <StandardArticleRow key={article.id} article={article} />
+                      ))}
+                    </div>
+                 </div>
+               )}
+             </div>
 
              {/* --- ZONES FEED --- */}
              {zones.length > 0 ? (

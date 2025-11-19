@@ -4,13 +4,13 @@ export type Language = 'en' | 'zh-TW';
 export const translations = {
   en: {
     appTitle: "INSpark Daily",
-    addZoneBtn: "Add Zone",
-    noZones: "No zones configured.",
-    createFirstZone: "Create your first News Zone",
+    addZoneBtn: "Add Topic",
+    noZones: "No topics configured.",
+    createFirstZone: "Create your first News Topic",
     
     // Navigation
     home: "Home",
-    myZones: "My Zones",
+    myZones: "My Topics",
     settings: "Settings",
     manageSources: "Manage Sources",
 
@@ -21,9 +21,9 @@ export const translations = {
     featured: "Featured Story",
     
     // Zone Management (New)
-    addZoneTitle: "Add New Zone",
-    editZoneTitle: "Edit Zone",
-    zoneTitleLabel: "Zone Title",
+    addZoneTitle: "Add New Topic",
+    editZoneTitle: "Edit Topic",
+    zoneTitleLabel: "Topic Title",
     zoneTitlePlaceholder: "e.g., Crypto News, Local Sports",
     sourcesLabel: "Manage Sources",
     sourcesHelp: "Add specific websites to track. Provide a name and URL.",
@@ -34,19 +34,19 @@ export const translations = {
     addSourceBtn: "Add Source",
     noSourcesAdded: "No sources added yet.",
     cancel: "Cancel",
-    createZone: "Create Zone",
-    updateZone: "Update Zone",
+    createZone: "Create Topic",
+    updateZone: "Update Topic",
     
     // ZoneCard/Feed
     refresh: "Refresh",
-    deleteZone: "Delete Zone",
-    editZone: "Edit Zone",
+    deleteZone: "Delete Topic",
+    editZone: "Edit Topic",
     sources: "Sources:",
     noNews: "No news available.",
     tryAgain: "Try Again",
     loading: "Loading...",
     errorFetch: "Failed to fetch latest news.",
-    confirmDelete: "Are you sure you want to remove this zone?",
+    confirmDelete: "Are you sure you want to remove this topic?",
 
     // Settings
     settingsTitle: "Settings",
@@ -58,7 +58,7 @@ export const translations = {
     testFunc: "Test Functionality",
     simulateBtn: "Simulate Daily Briefing Now",
     generating: "Generating Summary...",
-    testDesc: "Uses Gemini to aggregate news from your active zones and generates the email body that would be sent via the backend.",
+    testDesc: "Uses Gemini to aggregate news from your active topics and generates the email body that would be sent via the backend.",
     saveSettings: "Save Settings",
     previewTitle: "Daily Briefing Preview",
     
@@ -68,13 +68,13 @@ export const translations = {
   },
   'zh-TW': {
     appTitle: "INSpark Daily",
-    addZoneBtn: "新增專區",
-    noZones: "尚未設定任何新聞專區。",
-    createFirstZone: "建立您的第一個新聞專區",
+    addZoneBtn: "新增主題",
+    noZones: "尚未設定任何新聞主題。",
+    createFirstZone: "建立您的第一個新聞主題",
     
     // Navigation
     home: "首頁",
-    myZones: "我的專區",
+    myZones: "我的主題",
     settings: "設定",
     manageSources: "管理來源",
 
@@ -85,9 +85,9 @@ export const translations = {
     featured: "精選報導",
     
     // Zone Management (New)
-    addZoneTitle: "新增新聞專區",
-    editZoneTitle: "編輯專區",
-    zoneTitleLabel: "專區標題",
+    addZoneTitle: "新增新聞主題",
+    editZoneTitle: "編輯主題",
+    zoneTitleLabel: "主題名稱",
     zoneTitlePlaceholder: "例如：加密貨幣、體育新聞",
     sourcesLabel: "管理來源",
     sourcesHelp: "新增欲追蹤的網站。請提供名稱與網址。",
@@ -98,19 +98,19 @@ export const translations = {
     addSourceBtn: "新增來源",
     noSourcesAdded: "尚未新增來源。",
     cancel: "取消",
-    createZone: "建立專區",
-    updateZone: "更新專區",
+    createZone: "建立主題",
+    updateZone: "更新主題",
     
     // ZoneCard/Feed
     refresh: "重新整理",
-    deleteZone: "刪除專區",
-    editZone: "編輯專區",
+    deleteZone: "刪除主題",
+    editZone: "編輯主題",
     sources: "新聞來源：",
     noNews: "目前沒有相關新聞。",
     tryAgain: "再試一次",
     loading: "載入中...",
     errorFetch: "無法取得最新新聞。",
-    confirmDelete: "確定要刪除此專區嗎？",
+    confirmDelete: "確定要刪除此主題嗎？",
 
     // Settings
     settingsTitle: "設定",
@@ -122,7 +122,7 @@ export const translations = {
     testFunc: "功能測試",
     simulateBtn: "立即模擬每日摘要",
     generating: "正在產生摘要...",
-    testDesc: "使用 Gemini 匯聚您活躍專區的新聞，並模擬後端將發送的電子郵件內容。",
+    testDesc: "使用 Gemini 匯聚您活躍主題的新聞，並模擬後端將發送的電子郵件內容。",
     saveSettings: "儲存設定",
     previewTitle: "每日摘要預覽",
 
