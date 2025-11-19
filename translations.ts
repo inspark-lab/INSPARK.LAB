@@ -66,6 +66,18 @@ export const translations = {
     // Footer
     footerSlogan: "Your minimalist news hub. Aggregate, organize, and focus on the stories that matter most.",
     officialWebsite: "Official Website: INSpark Lab",
+
+    // Source Management Dashboard
+    manageSourcesTitle: "Source Management Dashboard",
+    sortBy: "Sort by",
+    sortByTopic: "Topic",
+    sortByName: "Source Name",
+    moveSource: "Move to...",
+    deleteSourceConfirm: "Remove this source?",
+    actions: "Actions",
+    sourceUrl: "URL",
+    currentTopic: "Current Topic",
+    noSourcesGlobal: "No sources found in any topic."
   },
   'zh-TW': {
     appTitle: "INSpark Daily",
@@ -131,5 +143,17 @@ export const translations = {
     // Footer
     footerSlogan: "您的極簡新聞中心。匯聚、整理並專注於最重要的故事。",
     officialWebsite: "官方網站：INSpark Lab",
+
+    // Source Management Dashboard
+    manageSourcesTitle: "來源管理儀表板",
+    sortBy: "排序方式",
+    sortByTopic: "主題",
+    sortByName: "來源名稱",
+    moveSource: "移動至...",
+    deleteSourceConfirm: "移除此來源？",
+    actions: "操作",
+    sourceUrl: "網址",
+    currentTopic: "目前主題",
+    noSourcesGlobal: "目前沒有任何來源。"
   }
 };

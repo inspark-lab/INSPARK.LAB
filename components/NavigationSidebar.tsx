@@ -11,6 +11,7 @@ interface NavigationSidebarProps {
   onOpenSettings: () => void;
   onEditZone: (zone: NewsZone) => void;
   onReorderZones: (zones: NewsZone[]) => void;
+  onOpenSourceManager: () => void;
 }
 
 const NavigationSidebar: React.FC<NavigationSidebarProps> = ({ 
@@ -20,7 +21,8 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   onAddZone,
   onOpenSettings,
   onEditZone,
-  onReorderZones
+  onReorderZones,
+  onOpenSourceManager
 }) => {
   const { t } = useLanguage();
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
@@ -127,22 +129,20 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
                 </button>
 
                 {/* Edit Button */}
-                {zone.id !== '1' && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditZone(zone);
-                    }}
-                    className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-deep-300 hover:text-white hover:bg-deep-400/50 transition-colors ${
-                       activeZoneId === zone.id ? 'text-deep-200' : 'opacity-0 group-hover:opacity-100'
-                    }`}
-                    title={t('editZone')}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                    </svg>
-                  </button>
-                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditZone(zone);
+                  }}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-deep-300 hover:text-white hover:bg-deep-400/50 transition-colors ${
+                      activeZoneId === zone.id ? 'text-deep-200' : 'opacity-0 group-hover:opacity-100'
+                  }`}
+                  title={t('editZone')}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                </button>
               </li>
             );
           })}
@@ -162,6 +162,17 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
           </svg>
           {t('addZoneBtn')}
         </button>
+        
+        {/* Manage Sources Button */}
+        <button
+          onClick={onOpenSourceManager}
+          className="mt-2 w-full flex items-center gap-2 px-3 py-2 text-sm text-deep-400 hover:text-deep-500 font-medium hover:bg-deep-100/50 rounded-md transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          {t('manageSources')}
+        </button>
 
         {/* Settings Button */}
         <button
@@ -175,14 +186,14 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
             {t('settings')}
          </button>
 
-         {/* INSpark Lab Link */}
+         {/* INSpark Lab Link - Filled Star Icon */}
          <a
            href="https://insparklab.com"
            target="_blank"
            rel="noopener noreferrer"
            className="mt-2 w-full flex items-center gap-2 px-3 py-2 text-sm text-deep-400 hover:text-deep-500 font-medium hover:bg-deep-100/50 rounded-md transition-colors"
          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 opacity-80" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-deep-400" viewBox="0 0 20 20" fill="currentColor">
                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
             </svg>
             INSpark Lab

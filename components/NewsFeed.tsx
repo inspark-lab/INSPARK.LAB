@@ -120,31 +120,23 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit, o
             </div>
         </div>
         <div className="flex gap-2 items-center">
-             {zone.id !== '1' && (
-               <>
-                 <button 
-                    onClick={() => onEdit(zone)} 
-                    className="text-xs text-deep-400 hover:text-deep-500 underline flex items-center gap-1"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                    </svg>
-                    {t('editZone')}
-                </button>
-                <span className="text-deep-200">|</span>
-               </>
-             )}
+            <button 
+                onClick={() => onEdit(zone)} 
+                className="text-xs text-deep-400 hover:text-deep-500 underline flex items-center gap-1"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                </svg>
+                {t('editZone')}
+            </button>
+            <span className="text-deep-200">|</span>
             <button onClick={() => onUpdate(zone.id, { articles: undefined })} className="text-xs text-deep-400 hover:text-deep-500 underline">
                 {t('refresh')}
             </button>
-            {zone.id !== '1' && (
-              <>
-                <span className="text-deep-200">|</span>
-                <button onClick={() => onDelete(zone.id)} className="text-xs text-red-400 hover:text-red-600 underline">
-                    {t('deleteZone')}
-                </button>
-              </>
-            )}
+            <span className="text-deep-200">|</span>
+            <button onClick={() => onDelete(zone.id)} className="text-xs text-red-400 hover:text-red-600 underline">
+                {t('deleteZone')}
+            </button>
         </div>
       </div>
 

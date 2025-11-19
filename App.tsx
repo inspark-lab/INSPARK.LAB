@@ -5,6 +5,7 @@ import NavigationSidebar from './components/NavigationSidebar';
 import NewsFeed from './components/NewsFeed';
 import SettingsDrawer from './components/SettingsDrawer';
 import ZoneEditModal from './components/ZoneEditModal';
+import SourceManagementDashboard from './components/SourceManagementDashboard';
 import HeroCarousel from './components/HeroCarousel';
 import FeaturedBoxCard from './components/FeaturedBoxCard';
 import StandardArticleRow from './components/StandardArticleRow';
@@ -16,18 +17,10 @@ import Toast from './components/Toast';
 // Initial Data
 const INITIAL_ZONES: NewsZone[] = [
   {
-    id: '1',
-    title: 'General',
-    sources: [
-      { name: 'INSPARK LAB', url: 'https://insparklab.com/feed/' },
-      { name: 'Crossing 換日線', url: 'https://crossing.cw.com.tw/rss' }
-    ],
-    isLoading: false
-  },
-  {
     id: '2',
     title: 'News & Current Affairs',
     sources: [
+      { name: 'INSPARK LAB', url: 'https://insparklab.com/feed/' },
       { name: 'BBC News 中文', url: 'https://feeds.bbci.co.uk/zhongwen/trad/rss.xml' },
       { name: 'BBC (World)', url: 'https://feeds.bbci.co.uk/news/rss.xml' }
     ],
@@ -65,6 +58,9 @@ function App() {
   // Zone Editing State
   const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
   const [editingZone, setEditingZone] = useState<NewsZone | null>(null);
+
+  // Source Management State
+  const [isSourceManagerOpen, setIsSourceManagerOpen] = useState(false);
 
   // Toast State
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
@@ -173,7 +169,6 @@ function App() {
   };
 
   const deleteZone = (id: string) => {
-    if (id === '1') return; // Deletion Guard for General
     if(window.confirm(t('confirmDelete'))) {
       const newZones = zones.filter(z => z.id !== id);
       setZones(newZones);
@@ -248,6 +243,51 @@ function App() {
     }
     setIsZoneModalOpen(false);
     setEditingZone(null);
+  };
+
+  // --- SOURCE MANAGEMENT HANDLERS ---
+  const handleMoveSource = (source: ZoneSource, fromZoneId: string, toZoneId: string) => {
+    setZones(prevZones => {
+      // 1. Remove from old zone
+      const withoutSource = prevZones.map(z => {
+        if (z.id === fromZoneId) {
+          return { 
+            ...z, 
+            sources: z.sources.filter(s => s.url !== source.url || s.name !== source.name),
+            articles: undefined // Invalidate cache
+          };
+        }
+        return z;
+      });
+
+      // 2. Add to new zone (checking for duplicates)
+      return withoutSource.map(z => {
+        if (z.id === toZoneId) {
+           const exists = z.sources.some(s => s.url === source.url);
+           if (exists) return z;
+           
+           return { 
+             ...z, 
+             sources: [...z.sources, source],
+             articles: undefined // Invalidate cache
+           };
+        }
+        return z;
+      });
+    });
+  };
+
+  const handleDeleteSource = (source: ZoneSource, fromZoneId: string) => {
+    setZones(prevZones => prevZones.map(z => {
+      if (z.id === fromZoneId) {
+        return { 
+          ...z, 
+          sources: z.sources.filter(s => s.url !== source.url || s.name !== source.name),
+          articles: undefined // Invalidate cache
+        };
+      }
+      return z;
+    }));
   };
 
   const toggleLanguage = () => {
@@ -383,6 +423,10 @@ function App() {
                 }}
                 onEditZone={handleOpenEditZone}
                 onReorderZones={handleReorderZones}
+                onOpenSourceManager={() => {
+                  setIsSourceManagerOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
               />
             </div>
           </div>
@@ -437,6 +481,7 @@ function App() {
               onOpenSettings={() => setIsSettingsOpen(true)}
               onEditZone={handleOpenEditZone}
               onReorderZones={handleReorderZones}
+              onOpenSourceManager={() => setIsSourceManagerOpen(true)}
             />
           </aside>
 
@@ -563,6 +608,15 @@ function App() {
         onClose={() => setIsZoneModalOpen(false)}
         onSave={handleSaveZone}
         initialZone={editingZone}
+      />
+
+      {/* Source Management Dashboard */}
+      <SourceManagementDashboard
+        isOpen={isSourceManagerOpen}
+        onClose={() => setIsSourceManagerOpen(false)}
+        zones={zones}
+        onMoveSource={handleMoveSource}
+        onDeleteSource={handleDeleteSource}
       />
 
       {/* Toast Notifications */}

@@ -1,5 +1,4 @@
-
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, PropsWithChildren } from 'react';
 import { translations, Language } from '../translations';
 
 interface LanguageContextType {
@@ -10,7 +9,7 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export const LanguageProvider = ({ children }: { children: ReactNode }) => {
+export const LanguageProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('en');
 
   useEffect(() => {

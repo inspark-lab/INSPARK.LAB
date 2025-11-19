@@ -4,6 +4,45 @@ import { GroundingChunk, ZoneSource, ZoneContentResponse } from "../types";
 export { type ZoneContentResponse };
 
 /**
+ * Helper to discover RSS feed URL from a homepage HTML.
+ */
+const findRssLinkFromHtml = async (url: string): Promise<string | null> => {
+  try {
+    // Use AllOrigins to bypass CORS for HTML fetching
+    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    if (!data.contents) return null;
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(data.contents, 'text/html');
+    
+    // Look for RSS
+    let link = doc.querySelector('link[type="application/rss+xml"]');
+    // Look for Atom
+    if (!link) link = doc.querySelector('link[type="application/atom+xml"]');
+    
+    if (link) {
+        const href = link.getAttribute('href');
+        if (href) {
+            try {
+                // Handle relative URLs
+                return new URL(href, url).href;
+            } catch (e) {
+                return href;
+            }
+        }
+    }
+    
+    return null;
+  } catch (e) {
+    console.warn(`RSS discovery failed for ${url}`, e);
+    return null;
+  }
+};
+
+/**
  * Fetches raw text content from a URL using multiple CORS proxies for reliability.
  * Strategy:
  * 1. Try AllOrigins (JSON mode) - Good for standard headers
@@ -92,13 +131,32 @@ export const fetchZoneNews = async (zoneTitle: string, sources: ZoneSource[]): P
     const promises = sources.map(async (source) => {
       if (!source.url) return [];
 
+      let fetchUrl = source.url;
+
+      // Auto-Discovery Logic: 
+      // If URL doesn't look like a feed, try to find one on the page.
+      const lowerUrl = fetchUrl.toLowerCase();
+      const isLikelyFeed = lowerUrl.includes('rss') || 
+                           lowerUrl.includes('feed') || 
+                           lowerUrl.includes('.xml') || 
+                           lowerUrl.includes('.json') ||
+                           lowerUrl.includes('feeds.');
+      
+      if (!isLikelyFeed) {
+         const discoveredUrl = await findRssLinkFromHtml(fetchUrl);
+         if (discoveredUrl) {
+             console.log(`Auto-discovered RSS for ${source.name}: ${discoveredUrl}`);
+             fetchUrl = discoveredUrl;
+         }
+      }
+
       let chunks: GroundingChunk[] = [];
       let success = false;
 
       // STRATEGY 1: Raw Fetch + DOMParser
       // Best for feeds that work with simple CORS proxies
       try {
-        const xmlContent = await fetchWithBackups(source.url);
+        const xmlContent = await fetchWithBackups(fetchUrl);
         
         if (xmlContent) {
           const parser = new DOMParser();
@@ -162,7 +220,7 @@ export const fetchZoneNews = async (zoneTitle: string, sources: ZoneSource[]): P
       // Robust for FeedBurner or valid RSS blocked by simple proxies
       if (!success || chunks.length === 0) {
         try {
-            const rss2jsonUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(source.url)}`;
+            const rss2jsonUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(fetchUrl)}`;
             const response = await fetch(rss2jsonUrl);
             if (response.ok) {
                 const data = await response.json();
@@ -191,7 +249,7 @@ export const fetchZoneNews = async (zoneTitle: string, sources: ZoneSource[]): P
       // Another specialized parser if rss2json fails
       if (!success || chunks.length === 0) {
          try {
-            const vercelUrl = `https://rss-to-json-serverless-api.vercel.app/api?feedURL=${encodeURIComponent(source.url)}`;
+            const vercelUrl = `https://rss-to-json-serverless-api.vercel.app/api?feedURL=${encodeURIComponent(fetchUrl)}`;
             const response = await fetch(vercelUrl);
             if (response.ok) {
                 const data = await response.json();
@@ -231,7 +289,7 @@ export const fetchZoneNews = async (zoneTitle: string, sources: ZoneSource[]): P
       // Final backup
       if (!success || chunks.length === 0) {
           try {
-              const factMavenUrl = `https://api.factmaven.com/xml-to-json?xml=${encodeURIComponent(source.url)}`;
+              const factMavenUrl = `https://api.factmaven.com/xml-to-json?xml=${encodeURIComponent(fetchUrl)}`;
               const response = await fetch(factMavenUrl);
               if (response.ok) {
                   const data = await response.json();
@@ -270,7 +328,7 @@ export const fetchZoneNews = async (zoneTitle: string, sources: ZoneSource[]): P
       // Another highly reliable parser
       if (!success || chunks.length === 0) {
           try {
-              const f2jUrl = `https://feed2json.org/convert?url=${encodeURIComponent(source.url)}`;
+              const f2jUrl = `https://feed2json.org/convert?url=${encodeURIComponent(fetchUrl)}`;
               const response = await fetch(f2jUrl);
               if (response.ok) {
                   const data = await response.json();
