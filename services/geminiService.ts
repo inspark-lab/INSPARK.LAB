@@ -4,96 +4,9 @@ import { GroundingChunk, ZoneSource, ZoneContentResponse } from "../types";
 export { type ZoneContentResponse };
 
 /**
- * Fetches raw text content from a URL using multiple CORS proxies for reliability.
- * Strategy:
- * 1. Try AllOrigins (JSON mode) - Good for standard headers
- * 2. Try AllOrigins (Raw mode) - Good for bypassing JSON parsing errors
- * 3. Fallback to CorsProxy.io (Raw mode) - Fast, usually reliable
- * 4. Fallback to CodeTabs (Raw mode) - Very reliable for redirects (FeedBurner)
- * 5. Fallback to ThingProxy (Raw mode) - Reliable backup
- */
-const fetchWithBackups = async (url: string): Promise<string | null> => {
-  const timeout = 15000; // 15 seconds
-
-  // Helper for timeout fetch
-  const fetchWithTimeout = async (fetchUrl: string) => {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-    try {
-      const response = await fetch(fetchUrl, { signal: controller.signal });
-      clearTimeout(id);
-      return response;
-    } catch (error) {
-      clearTimeout(id);
-      throw error;
-    }
-  };
-
-  // Proxy 1: AllOrigins (Returns JSON with .contents)
-  try {
-    const response = await fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-    if (response.ok) {
-      const data = await response.json();
-      if (data.contents) return data.contents;
-    }
-  } catch (err) {
-    // console.warn(`Primary proxy (AllOrigins JSON) failed for ${url}`);
-  }
-
-  // Proxy 1.5: AllOrigins (Raw mode)
-  try {
-    const response = await fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
-    if (response.ok) {
-      return await response.text();
-    }
-  } catch (err) {
-     // console.warn(`Secondary proxy (AllOrigins Raw) failed for ${url}`);
-  }
-
-  // Proxy 2: CorsProxy.io (Returns Raw Text)
-  try {
-    const response = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-    if (response.ok) {
-      const text = await response.text();
-      if (text.length > 50 && !text.includes('Error 404') && !text.includes('Proxy Error')) {
-          return text;
-      }
-    }
-  } catch (err) {
-    // console.warn(`Secondary proxy (CorsProxy) failed for ${url}`);
-  }
-
-  // Proxy 3: CodeTabs (Returns Raw Text)
-  try {
-    const response = await fetchWithTimeout(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`);
-    if (response.ok) {
-      return await response.text();
-    }
-  } catch (err) {
-    // console.warn(`Tertiary proxy (CodeTabs) failed for ${url}`);
-  }
-
-   // Proxy 4: ThingProxy (Returns Raw Text)
-  try {
-    const response = await fetchWithTimeout(`https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}`);
-    if (response.ok) {
-      return await response.text();
-    }
-  } catch (err) {
-    // console.warn(`Quaternary proxy (ThingProxy) failed for ${url}`);
-  }
-
-  return null;
-};
-
-/**
  * Safe RSS Fetcher
- * 1. Smart Fetch: Tries to guess RSS suffixes if URL is not a direct feed.
- * 2. Tries standard XML fetch via Proxies + DOMParser.
- * 3. Fallback: RSS2JSON API.
- * 4. Fallback: Vercel RSS Parser API.
- * 5. Fallback: FactMaven XML-to-JSON API.
- * 6. Fallback: Feed2Json API.
+ * Uses the backend serverless API (/api/fetch-rss) to fetch feeds.
+ * The backend handles CORS, User-Agents, and Suffix Guessing.
  */
 export const fetchZoneNews = async (zoneTitle: string, sources: ZoneSource[]): Promise<ZoneContentResponse> => {
   if (!sources || sources.length === 0) {
@@ -104,122 +17,91 @@ export const fetchZoneNews = async (zoneTitle: string, sources: ZoneSource[]): P
     const promises = sources.map(async (source) => {
       if (!source.url) return [];
 
-      let fetchUrl = source.url;
-      let preFetchedContent: string | null = null;
-
-      // --- SMART FETCH: RSS Suffix Guessing ---
-      const lowerUrl = fetchUrl.toLowerCase();
-      const isLikelyFeed = lowerUrl.includes('rss') || 
-                           lowerUrl.includes('feed') || 
-                           lowerUrl.includes('.xml') || 
-                           lowerUrl.includes('.json');
-      
-      if (!isLikelyFeed) {
-          // Remove trailing slash
-          const baseUrl = fetchUrl.replace(/\/$/, '');
-          // Suffixes to try in order
-          const candidates = [
-              fetchUrl, // Try original first
-              `${baseUrl}/feed`,
-              `${baseUrl}/rss`,
-              `${baseUrl}/rss.xml`,
-              `${baseUrl}/atom.xml`,
-              `${baseUrl}/feed.xml`,
-              `${baseUrl}/index.xml`
-          ];
-          
-          // Sequential check
-          for (const candidate of candidates) {
-              try {
-                  // Use our proxy fetcher to check if content exists
-                  const content = await fetchWithBackups(candidate);
-                  // Basic check if it looks like XML/RSS/Atom (starts with <) or JSON (starts with {)
-                  if (content) {
-                      const trimmed = content.trim();
-                      if (trimmed.startsWith('<') || trimmed.startsWith('{')) {
-                          // Double check for HTML doctype which we don't want (unless it's embedded RSS, but we are guessing suffixes)
-                          if (!trimmed.toLowerCase().startsWith('<!doctype html') && !trimmed.toLowerCase().startsWith('<html')) {
-                              console.log(`Smart Fetch: Found valid feed at ${candidate}`);
-                              fetchUrl = candidate;
-                              preFetchedContent = content;
-                              break; // Found it!
-                          }
-                      }
-                  }
-              } catch (e) {
-                  // Continue to next candidate
-              }
-          }
+      // URL Normalization
+      let fetchUrl = source.url.trim();
+      if (!fetchUrl.match(/^https?:\/\//i)) {
+          fetchUrl = `https://${fetchUrl}`;
       }
 
       let chunks: GroundingChunk[] = [];
       let success = false;
 
-      // STRATEGY 1: Raw Fetch + DOMParser
-      // Best for feeds that work with simple CORS proxies
+      // STRATEGY 1: Local Serverless API (The Reliable Proxy)
       try {
-        // Use the pre-fetched content if we found it during smart fetch, otherwise fetch now
-        const xmlContent = preFetchedContent || await fetchWithBackups(fetchUrl);
+        const apiUrl = `/api/fetch-rss?url=${encodeURIComponent(fetchUrl)}`;
+        const response = await fetch(apiUrl);
         
-        if (xmlContent) {
-          const parser = new DOMParser();
-          const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
-          const parseError = xmlDoc.querySelector('parsererror');
+        if (response.ok) {
+          const contentType = response.headers.get('content-type') || '';
           
-          if (!parseError) {
-            const items = Array.from(xmlDoc.querySelectorAll("item, entry"));
-            chunks = items.map(item => {
-              const title = item.querySelector("title")?.textContent?.trim() || "No Title";
-              let link = item.querySelector("link")?.textContent?.trim() || "";
-              if (!link) {
-                 const linkNode = item.querySelector("link");
-                 if (linkNode) link = linkNode.getAttribute("href") || "";
-              }
-              const pubDate = item.querySelector("pubDate, date, updated")?.textContent?.trim() || "";
-              const description = item.querySelector("description, summary, content")?.textContent || "";
-              const contentEncoded = item.getElementsByTagNameNS("*", "encoded")[0]?.textContent || "";
-
-              // Image Extraction
-              let imageUrl = "";
-              const mediaContent = item.getElementsByTagNameNS("*", "content"); 
-              if (mediaContent.length > 0) imageUrl = mediaContent[0].getAttribute("url") || "";
-              
-              if (!imageUrl) {
-                  const mediaThumbnail = item.getElementsByTagNameNS("*", "thumbnail");
-                  if (mediaThumbnail.length > 0) imageUrl = mediaThumbnail[0].getAttribute("url") || "";
-              }
-              if (!imageUrl) {
-                 const enclosure = item.querySelector("enclosure");
-                 if (enclosure && enclosure.getAttribute("type")?.startsWith("image")) {
-                    imageUrl = enclosure.getAttribute("url") || "";
-                 }
-              }
-              if (!imageUrl) {
-                 const textToSearch = contentEncoded || description;
-                 const match = textToSearch.match(/<img[^>]+src="([^">]+)"/);
-                 if (match) imageUrl = match[1];
-              }
-
-              return {
-                web: { title, uri: link },
-                meta: {
-                  sourceName: source.name,
-                  publishedAt: pubDate,
-                  imageUrl: imageUrl,
-                  description: description.replace(/<[^>]*>?/gm, '').substring(0, 150)
-                }
-              };
-            });
-            if (chunks.length > 0) success = true;
+          if (contentType.includes('application/json')) {
+             // Handle JSON Feed response if backend decided to return JSON
+             const data = await response.json();
+             // (Assuming backend passes raw text, but if it parsed Feed2Json it might be object. 
+             //  Our backend currently returns raw text, so this block catches raw JSON text if valid)
+             // Not typically hit with our current backend logic unless we extend it, 
+             // but kept safe. 
           } else {
-            console.warn(`XML Parsing error for ${source.name}, trying fallback...`);
+             // Handle XML Response (Standard)
+             const xmlContent = await response.text();
+             const parser = new DOMParser();
+             const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
+             const parseError = xmlDoc.querySelector('parsererror');
+             
+             if (!parseError) {
+                const items = Array.from(xmlDoc.querySelectorAll("item, entry"));
+                chunks = items.map(item => {
+                  const title = item.querySelector("title")?.textContent?.trim() || "No Title";
+                  let link = item.querySelector("link")?.textContent?.trim() || "";
+                  if (!link) {
+                     const linkNode = item.querySelector("link");
+                     if (linkNode) link = linkNode.getAttribute("href") || "";
+                  }
+                  const pubDate = item.querySelector("pubDate, date, updated")?.textContent?.trim() || "";
+                  const description = item.querySelector("description, summary, content")?.textContent || "";
+                  const contentEncoded = item.getElementsByTagNameNS("*", "encoded")[0]?.textContent || "";
+
+                  // Image Extraction
+                  let imageUrl = "";
+                  const mediaContent = item.getElementsByTagNameNS("*", "content"); 
+                  if (mediaContent.length > 0) imageUrl = mediaContent[0].getAttribute("url") || "";
+                  
+                  if (!imageUrl) {
+                      const mediaThumbnail = item.getElementsByTagNameNS("*", "thumbnail");
+                      if (mediaThumbnail.length > 0) imageUrl = mediaThumbnail[0].getAttribute("url") || "";
+                  }
+                  if (!imageUrl) {
+                     const enclosure = item.querySelector("enclosure");
+                     if (enclosure && enclosure.getAttribute("type")?.startsWith("image")) {
+                        imageUrl = enclosure.getAttribute("url") || "";
+                     }
+                  }
+                  if (!imageUrl) {
+                     const textToSearch = contentEncoded || description;
+                     const match = textToSearch.match(/<img[^>]+src="([^">]+)"/);
+                     if (match) imageUrl = match[1];
+                  }
+
+                  return {
+                    web: { title, uri: link },
+                    meta: {
+                      sourceName: source.name,
+                      publishedAt: pubDate,
+                      imageUrl: imageUrl,
+                      description: description.replace(/<[^>]*>?/gm, '').substring(0, 150)
+                    }
+                  };
+                });
+                if (chunks.length > 0) success = true;
+             }
           }
         }
       } catch (err) {
-         console.warn(`Raw fetch failed for ${source.name}, trying fallback...`);
+         console.warn(`API fetch failed for ${source.name}`, err);
       }
 
-      // STRATEGY 2: RSS2JSON Fallback
+      // STRATEGY 2: Fallback - RSS2JSON (Public API)
+      // Kept as a backup in case the local API hits limits or fails
       if (!success || chunks.length === 0) {
         try {
             const rss2jsonUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(fetchUrl)}`;
@@ -243,115 +125,11 @@ export const fetchZoneNews = async (zoneTitle: string, sources: ZoneSource[]): P
                 }
             }
         } catch (fallbackErr) {
-            console.error(`Fallback 1 (rss2json) failed for ${source.name}`, fallbackErr);
+            console.warn(`Fallback (rss2json) failed for ${source.name}`);
         }
       }
 
-      // STRATEGY 3: Vercel RSS Parser Fallback
-      if (!success || chunks.length === 0) {
-         try {
-            const vercelUrl = `https://rss-to-json-serverless-api.vercel.app/api?feedURL=${encodeURIComponent(fetchUrl)}`;
-            const response = await fetch(vercelUrl);
-            if (response.ok) {
-                const data = await response.json();
-                if (data.items && Array.isArray(data.items)) {
-                    chunks = data.items.map((item: any) => {
-                         let img = '';
-                         if (item.enclosure && item.enclosure.type && item.enclosure.type.startsWith('image')) {
-                             img = item.enclosure.url;
-                         }
-                         if (!img && item.media && item.media.content && item.media.content.url) {
-                             img = item.media.content.url;
-                         }
-
-                        return {
-                            web: {
-                                title: item.title,
-                                uri: item.url || item.link
-                            },
-                            meta: {
-                                sourceName: source.name,
-                                publishedAt: item.created ? new Date(item.created).toISOString() : item.published,
-                                imageUrl: img,
-                                description: (item.description || '').replace(/<[^>]*>?/gm, '').substring(0, 150)
-                            }
-                        };
-                    });
-                    if (chunks.length > 0) success = true;
-                }
-            }
-         } catch (fallbackErr2) {
-             console.error(`Fallback 2 (vercel-rss) failed for ${source.name}`, fallbackErr2);
-         }
-      }
-
-      // STRATEGY 4: FactMaven XML-to-JSON Fallback
-      if (!success || chunks.length === 0) {
-          try {
-              const factMavenUrl = `https://api.factmaven.com/xml-to-json?xml=${encodeURIComponent(fetchUrl)}`;
-              const response = await fetch(factMavenUrl);
-              if (response.ok) {
-                  const data = await response.json();
-                  const items = data.rss?.channel?.item || data.channel?.item || [];
-                  const itemsArray = Array.isArray(items) ? items : (items ? [items] : []);
-                  
-                  if (itemsArray.length > 0) {
-                      chunks = itemsArray.map((item: any) => {
-                          let img = '';
-                          if (item.enclosure && item.enclosure.url) img = item.enclosure.url;
-                          if (!img && item.media_content && item.media_content.url) img = item.media_content.url;
-                          
-                          return {
-                              web: {
-                                  title: item.title || 'No Title',
-                                  uri: item.link || ''
-                              },
-                              meta: {
-                                  sourceName: source.name,
-                                  publishedAt: item.pubDate || '',
-                                  imageUrl: img,
-                                  description: (item.description || '').replace(/<[^>]*>?/gm, '').substring(0, 150)
-                              }
-                          };
-                      });
-                      if (chunks.length > 0) success = true;
-                  }
-              }
-          } catch (fallbackErr3) {
-              console.error(`Fallback 3 (factmaven) failed for ${source.name}`, fallbackErr3);
-          }
-      }
-
-      // STRATEGY 5: Feed2Json Fallback
-      if (!success || chunks.length === 0) {
-          try {
-              const f2jUrl = `https://feed2json.org/convert?url=${encodeURIComponent(fetchUrl)}`;
-              const response = await fetch(f2jUrl);
-              if (response.ok) {
-                  const data = await response.json();
-                  if (data.items && Array.isArray(data.items)) {
-                      chunks = data.items.map((item: any) => ({
-                          web: {
-                              title: item.title,
-                              uri: item.url
-                          },
-                          meta: {
-                              sourceName: source.name,
-                              publishedAt: item.date_published,
-                              imageUrl: item.image || item.banner_image || '',
-                              description: (item.content_text || item.summary || '').replace(/<[^>]*>?/gm, '').substring(0, 150)
-                          }
-                      }));
-                      if (chunks.length > 0) success = true;
-                  }
-              }
-          } catch (fallbackErr4) {
-               console.error(`Fallback 5 (feed2json) failed for ${source.name}`, fallbackErr4);
-          }
-      }
-
       if (!success) {
-          console.error(`All strategies failed for ${source.name}`);
           return [];
       }
 
@@ -374,7 +152,7 @@ export const fetchZoneNews = async (zoneTitle: string, sources: ZoneSource[]): P
     const validChunks = allChunks.filter(c => c.web?.uri);
 
     if (validChunks.length === 0 && sources.length > 0) {
-        throw new Error(`Failed to fetch news for ${zoneTitle}`);
+        return { text: 'No articles found', chunks: [] };
     }
 
     return {
@@ -384,10 +162,10 @@ export const fetchZoneNews = async (zoneTitle: string, sources: ZoneSource[]): P
 
   } catch (error: any) {
     console.error("Critical error in fetchZoneNews:", error);
-    throw error.message || "Error loading feeds.";
+    return { text: 'Error loading feeds', chunks: [] };
   }
 };
 
 export const generateDailyBriefing = async (zones: any[]): Promise<string> => {
-  return "Daily briefing generation requires backend API configuration. Please enable the Gemini API to use this feature.";
+  return "Daily briefing generation requires backend API configuration.";
 };
