@@ -36,7 +36,7 @@ const INITIAL_ZONES: NewsZone[] = [
       { name: 'WEB 3+', url: 'https://web3plus.bnext.com.tw/rss' },
       { name: 'PANews', url: 'https://rss.panewslab.com/zh/rss.xml' },
       { name: '鏈新聞', url: 'https://abmedia.io/feed' },
-      { name: '區塊客', url: 'https://blockcast.it/feed/' },
+      { name: '區塊客', url: 'https://news.google.com/rss/search?q=site:blockcast.it&hl=zh-TW&gl=TW&ceid=TW:zh-Hant' }, // Switched to Google News Proxy
       { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' } 
     ],
     isLoading: false
@@ -46,7 +46,6 @@ const INITIAL_ZONES: NewsZone[] = [
     title: 'Marketing / Life style',
     sources: [
       { name: 'INSPARK LAB', url: 'https://insparklab.com/feed/' },
-      { name: 'Marketing Dive', url: 'https://www.marketingdive.com/feeds/news/' }, 
       { name: 'The Ahrefs Blog', url: 'https://ahrefs.com/blog/feed/' }
     ],
     isLoading: false
@@ -109,7 +108,9 @@ function App() {
            'CNA 中央社 (TW)': { name: 'CNA 中央社 (TW)', url: 'https://news.google.com/rss/search?q=site:cna.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant' },
            'Focus Taiwan (EN)': { name: 'Focus Taiwan (EN)', url: 'https://news.google.com/rss/search?q=site:focustaiwan.tw&hl=en-US&gl=US&ceid=US:en' },
            'Coingecko': { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' },
-           'Marketing Brew': { name: 'Marketing Dive', url: 'https://www.marketingdive.com/feeds/news/' }
+           'Marketing Brew': { name: 'The Ahrefs Blog', url: 'https://ahrefs.com/blog/feed/' }, // Migrate away from Marketing Brew/Dive
+           'Marketing Dive': { name: 'The Ahrefs Blog', url: 'https://ahrefs.com/blog/feed/' }, // Also catch Dive if previously migrated
+           '區塊客': { name: '區塊客', url: 'https://news.google.com/rss/search?q=site:blockcast.it&hl=zh-TW&gl=TW&ceid=TW:zh-Hant' }
         };
 
         parsedZones = parsedZones.map((z: NewsZone) => ({
