@@ -1,157 +1,127 @@
 
-import { GoogleGenAI } from "@google/genai";
-import { GroundingChunk, ZoneSource } from "../types";
+import { GroundingChunk, ZoneSource, ZoneContentResponse } from "../types";
 
-// Initialize Gemini Client safely
-// The API key must be obtained exclusively from the environment variable process.env.API_KEY
-const apiKey = process.env.API_KEY;
-let ai: GoogleGenAI | null = null;
-
-// Robust initialization: only create client if key exists
-if (apiKey) {
-  try {
-    ai = new GoogleGenAI({ apiKey: apiKey });
-  } catch (error) {
-    console.warn("Failed to initialize GoogleGenAI client:", error);
-  }
-} else {
-  console.warn("API Key missing or invalid. Using Mock Data mode.");
-}
-
-export interface ZoneContentResponse {
-  text: string;
-  chunks: GroundingChunk[];
-}
+export { type ZoneContentResponse };
 
 /**
- * Generates realistic mock data when API is unavailable
- */
-const getMockNews = (zoneTitle: string, count: number = 8): ZoneContentResponse => {
-  const baseTitles = [
-    `Major Breakthrough in ${zoneTitle} Announced Today`,
-    `Global ${zoneTitle} Trends: What You Need to Know`,
-    `Top Experts Discuss the Future of ${zoneTitle}`,
-    `New Regulations Impacting the ${zoneTitle} Sector`,
-    `Innovation Spotlight: ${zoneTitle} Startups to Watch`,
-    `Market Analysis: ${zoneTitle} Sees Unprecedented Growth`,
-    `Exclusive: Behind the Scenes of the Latest ${zoneTitle} Event`,
-    `Guide: How to Navigate the Changing Landscape of ${zoneTitle}`
-  ];
-
-  // Scramble/select distinct titles based on requested count
-  const selectedTitles = baseTitles.slice(0, count);
-
-  const chunks: GroundingChunk[] = selectedTitles.map((title, i) => ({
-    web: {
-      title: title,
-      uri: `https://example.com/mock-news/${zoneTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/${i + 1}`
-    }
-  }));
-
-  return {
-    text: `## Latest Headlines for ${zoneTitle} (Mock Data)\n\nSystem is currently running in fallback mode due to missing API configuration.`,
-    chunks
-  };
-};
-
-/**
- * Fetches news for a specific zone using Google Search Grounding.
- * Includes fallback to mock data if API is missing or fails.
+ * Safe RSS Fetcher
+ * Fetches news from RSS feeds using a CORS proxy to avoid browser restrictions.
+ * Returns empty arrays on failure instead of throwing errors.
  */
 export const fetchZoneNews = async (zoneTitle: string, sources: ZoneSource[]): Promise<ZoneContentResponse> => {
-  // 1. Check if API client is available
-  if (!ai || !apiKey) {
-    console.log(`API Key missing. Returning mock news for zone: ${zoneTitle}`);
-    // Simulate network delay for realism
-    await new Promise(resolve => setTimeout(resolve, 800));
-    return getMockNews(zoneTitle);
+  if (!sources || sources.length === 0) {
+    return { text: '', chunks: [] };
   }
 
-  try {
-    const queryList = sources.map(s => `${s.name} (${s.url})`).join(", ");
-    const prompt = `
-      You are a news aggregator backend. 
-      Find the absolute latest and most important news headlines for the following websites/sources: ${queryList}.
-      Focus on the category: ${zoneTitle}.
-      Provide a concise markdown summary of the top 5-8 stories. 
-      Do not use strictly JSON, just readable markdown text with bullet points.
-    `;
+  console.log(`Fetching RSS for zone: ${zoneTitle} with sources:`, sources);
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-      },
+  try {
+    const promises = sources.map(async (source) => {
+      if (!source.url) return [];
+
+      try {
+        // Use allorigins.win as a free CORS proxy
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(source.url)}`;
+        const response = await fetch(proxyUrl);
+        
+        if (!response.ok) {
+          console.warn(`Failed to fetch ${source.name}: ${response.statusText}`);
+          return [];
+        }
+
+        const data = await response.json();
+        if (!data.contents) return [];
+
+        // Parse XML
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(data.contents, "text/xml");
+        
+        const items = Array.from(xmlDoc.querySelectorAll("item, entry"));
+        
+        return items.map(item => {
+          const title = item.querySelector("title")?.textContent || "No Title";
+          
+          // Extract Link
+          let link = item.querySelector("link")?.textContent || "";
+          if (!link) {
+             // Atom feeds often have <link href="..." />
+             const linkNode = item.querySelector("link");
+             if (linkNode) link = linkNode.getAttribute("href") || "";
+          }
+
+          // Extract Date
+          const pubDate = item.querySelector("pubDate, date, updated")?.textContent || "";
+          
+          // Extract Description/Content for Image parsing
+          const description = item.querySelector("description, summary, content")?.textContent || "";
+
+          // Attempt to find an image
+          let imageUrl = "";
+          const mediaContent = item.getElementsByTagNameNS("*", "content"); // media:content
+          if (mediaContent.length > 0) {
+             imageUrl = mediaContent[0].getAttribute("url") || "";
+          }
+          
+          if (!imageUrl) {
+             const enclosure = item.querySelector("enclosure");
+             if (enclosure && enclosure.getAttribute("type")?.startsWith("image")) {
+                imageUrl = enclosure.getAttribute("url") || "";
+             }
+          }
+
+          if (!imageUrl && description) {
+             // Regex to find first img src in description HTML
+             const match = description.match(/<img[^>]+src="([^">]+)"/);
+             if (match) imageUrl = match[1];
+          }
+
+          const chunk: GroundingChunk = {
+            web: {
+              title: title,
+              uri: link
+            },
+            meta: {
+              sourceName: source.name,
+              publishedAt: pubDate,
+              imageUrl: imageUrl,
+              description: description.substring(0, 150) // Brief snippet
+            }
+          };
+          return chunk;
+        });
+
+      } catch (err) {
+        console.error(`Error parsing feed for ${source.name}:`, err);
+        return []; // Return empty for this source, don't crash entire batch
+      }
     });
 
-    const text = response.text || "No news found at this time.";
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks as GroundingChunk[] || [];
+    const results = await Promise.all(promises);
+    const allChunks = results.flat();
 
-    // If API returns no chunks (sometimes happens), fallback to mock to keep UI populated
-    if (chunks.length === 0) {
-      console.warn("API returned no chunks, using fallback.");
-      return getMockNews(zoneTitle);
-    }
+    // Sort by date (newest first) if possible
+    allChunks.sort((a, b) => {
+      const dateA = new Date(a.meta?.publishedAt || 0).getTime();
+      const dateB = new Date(b.meta?.publishedAt || 0).getTime();
+      return dateB - dateA;
+    });
 
-    return { text, chunks };
+    // Filter out items with no link
+    const validChunks = allChunks.filter(c => c.web?.uri);
+
+    return {
+      text: `Aggregated ${validChunks.length} articles.`,
+      chunks: validChunks
+    };
+
   } catch (error) {
-    // 2. Catch-all for API errors (Network, 401, 500, Quota)
-    console.error("Error fetching zone news (API failure). Using fallback mock data.", error);
-    return getMockNews(zoneTitle);
+    console.error("Critical error in fetchZoneNews:", error);
+    // Return safe fallback to prevent white screen
+    return { text: "Error loading feeds.", chunks: [] };
   }
 };
 
-/**
- * Simulates the "Notification System" by generating a newsletter summary.
- */
-export const generateDailyBriefing = async (zones: { title: string, sources: ZoneSource[] }[]): Promise<string> => {
-  if (!ai || !apiKey) {
-    return `
-# INSpark Daily Briefing (Preview Mode)
-
-*System Note: API Key is missing. Displaying template.*
-
-## Good Morning!
-Here is your daily summary for **${new Date().toLocaleDateString()}**.
-
-### ${zones[0]?.title || 'General News'}
-* **Top Story:** Major industry shifts observed this week.
-* **Highlight:** Key players announce new strategic partnerships.
-* **Insight:** Analysts predict positive trends for the upcoming quarter.
-
-### ${zones[1]?.title || 'Technology'}
-* **Innovation:** New AI models demonstrate reasoning capabilities.
-* **Update:** Security patches released for major platforms.
-
-*To see real AI-generated summaries, please configure a valid Google Gemini API Key.*
-    `;
-  }
-
-  try {
-    const topics = zones.map(z => `${z.title}: ${z.sources.map(s => s.name).join(', ')}`).join('\n');
-    
-    const prompt = `
-      Generate a "Daily Morning Briefing" email content for a user interested in these areas:
-      ${topics}
-
-      Use Google Search to find the very latest headlines for these topics right now.
-      Format the output as a clean, professional email body.
-      Start with "Good Morning, here is your INSpark Daily Briefing."
-      Group by Zone Title.
-    `;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-         tools: [{ googleSearch: {} }],
-      },
-    });
-
-    return response.text || "Unable to generate briefing.";
-  } catch (error) {
-    console.error("Error generating briefing:", error);
-    return "Error generating daily briefing due to API limitations. Please try again later.";
-  }
+// Placeholder for briefing generation - keeping it safe
+export const generateDailyBriefing = async (zones: any[]): Promise<string> => {
+  return "Daily briefing generation requires backend API configuration. Please enable the Gemini API to use this feature.";
 };
