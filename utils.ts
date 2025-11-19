@@ -71,7 +71,8 @@ export const mapChunksToArticles = (chunks: GroundingChunk[]): Article[] => {
           url: c.web?.uri || '#',
           source: c.meta?.sourceName || (c.web?.uri ? new URL(c.web.uri).hostname.replace('www.', '') : 'Source'),
           imageUrl: imageUrl,
-          publishedAt: formatDate(c.meta?.publishedAt)
+          publishedAt: formatDate(c.meta?.publishedAt),
+          description: c.meta?.description
       };
     });
 };

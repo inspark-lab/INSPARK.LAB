@@ -11,6 +11,7 @@ import StandardArticleRow from './components/StandardArticleRow';
 import { v4 as uuidv4 } from 'uuid';
 import { useLanguage } from './contexts/LanguageContext';
 import { mapChunksToArticles } from './utils';
+import Toast from './components/Toast';
 
 // Initial Data
 const INITIAL_ZONES: NewsZone[] = [
@@ -28,8 +29,7 @@ const INITIAL_ZONES: NewsZone[] = [
     title: 'News & Current Affairs',
     sources: [
       { name: 'BBC News 中文', url: 'https://feeds.bbci.co.uk/zhongwen/trad/rss.xml' },
-      { name: 'BBC (World)', url: 'https://feeds.bbci.co.uk/news/rss.xml' },
-      { name: 'The News Lens 關鍵評論網', url: 'https://feeds.feedburner.com/tnl-taiwan' }
+      { name: 'BBC (World)', url: 'https://feeds.bbci.co.uk/news/rss.xml' }
     ],
     isLoading: false
   },
@@ -66,8 +66,15 @@ function App() {
   const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
   const [editingZone, setEditingZone] = useState<NewsZone | null>(null);
 
+  // Toast State
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+
+  // Expansion State (for Read More)
+  const [expandedTopics, setExpandedTopics] = useState<string[]>([]);
+
   // Ref to disable scroll spy temporarily during click scrolling
   const isClickScrolling = useRef(false);
+  const allNewsJustInRef = useRef<HTMLDivElement>(null);
 
   // Load Data
   useEffect(() => {
@@ -166,6 +173,7 @@ function App() {
   };
 
   const deleteZone = (id: string) => {
+    if (id === '1') return; // Deletion Guard for General
     if(window.confirm(t('confirmDelete'))) {
       const newZones = zones.filter(z => z.id !== id);
       setZones(newZones);
@@ -246,20 +254,54 @@ function App() {
     setLanguage(language === 'en' ? 'zh-TW' : 'en');
   };
 
+  const showToast = (message: string) => {
+    setToast({ message, visible: true });
+  };
+
+  const toggleTopicExpansion = (id: string) => {
+    setExpandedTopics(prev => {
+      const isExpanded = prev.includes(id);
+      // If collapsing and it's the all-news section, scroll to top of its Just In section
+      if (isExpanded && id === 'all-news' && allNewsJustInRef.current) {
+        allNewsJustInRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      
+      return isExpanded ? prev.filter(tid => tid !== id) : [...prev, id];
+    });
+  };
+
   // Aggregation Logic for "All News" Section
   const getAggregatedArticles = () => {
     const allChunks = zones.flatMap(z => z.articles || []);
     const articles = mapChunksToArticles(allChunks);
-    // Shuffle simply for variety using a sort with random
-    return articles.sort(() => Math.random() - 0.5);
+    
+    // CONTENT PRIORITIZATION: Pin INSPARK LAB articles to the top
+    const pinnedArticles = articles.filter(a => 
+      a.source.toUpperCase().includes('INSPARK') || 
+      a.url.includes('insparklab.com')
+    );
+    
+    const otherArticles = articles.filter(a => 
+      !a.source.toUpperCase().includes('INSPARK') && 
+      !a.url.includes('insparklab.com')
+    );
+
+    // Sort others by random/shuffle or date
+    otherArticles.sort(() => Math.random() - 0.5);
+
+    return [...pinnedArticles, ...otherArticles];
   };
 
   const allArticles = getAggregatedArticles();
   
   // 3-Tier Slicing
-  const heroArticles = allArticles.slice(0, 5); // Tier 1: Top 5
-  const featuredArticles = allArticles.slice(5, 9); // Tier 2: Next 4
-  const standardArticles = allArticles.slice(9, 15); // Tier 3: Next 6
+  const heroArticles = allArticles.slice(0, 6); // Tier 1: Top 6
+  const featuredArticles = allArticles.slice(6, 10); // Tier 2: Next 4
+  
+  // Tier 3: Check expansion
+  const isAllNewsExpanded = expandedTopics.includes('all-news');
+  const standardArticles = isAllNewsExpanded ? allArticles.slice(10) : allArticles.slice(10, 16);
+  const hasMoreAllNews = allArticles.length > 16;
 
   return (
     <div className="min-h-screen bg-deep-100 text-deep-500 font-sans flex flex-col">
@@ -384,7 +426,7 @@ function App() {
 
                {/* --- TIER 3: Standard List (6 Lines) --- */}
                {standardArticles.length > 0 && (
-                 <div className="mb-16">
+                 <div className="mb-16" ref={allNewsJustInRef}>
                     <h2 className="text-lg font-bold text-deep-500 border-b border-deep-200 pb-2 mb-6 uppercase tracking-wide">
                       {t('justIn')}
                     </h2>
@@ -393,6 +435,18 @@ function App() {
                         <StandardArticleRow key={article.id} article={article} />
                       ))}
                     </div>
+                    
+                    {/* Read More Button for All News */}
+                    {hasMoreAllNews && (
+                      <div className="mt-6 flex justify-center">
+                        <button
+                          onClick={() => toggleTopicExpansion('all-news')}
+                          className="px-6 py-2 bg-deep-100 text-deep-400 font-medium rounded-full border border-deep-200 hover:bg-deep-200 hover:text-deep-500 transition-all shadow-sm"
+                        >
+                          {isAllNewsExpanded ? t('showLess') : t('readMore')}
+                        </button>
+                      </div>
+                    )}
                  </div>
                )}
              </div>
@@ -411,6 +465,9 @@ function App() {
                        onUpdate={updateZone}
                        onDelete={deleteZone}
                        onEdit={handleOpenEditZone}
+                       onError={showToast}
+                       isExpanded={expandedTopics.includes(zone.id)}
+                       onToggleExpand={() => toggleTopicExpansion(zone.id)}
                      />
                    </div>
                  ))}
@@ -429,9 +486,9 @@ function App() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-deep-200 mt-auto py-8">
+      <footer className="bg-deep-500 mt-auto py-8">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-sm text-deep-300 font-light mb-4">
+          <p className="text-sm text-deep-200 font-light mb-4">
             {t('footerSlogan')}
           </p>
           <div className="flex flex-col items-center gap-2">
@@ -439,11 +496,11 @@ function App() {
               href="https://insparklab.com" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-sm text-deep-400 hover:text-deep-500 font-medium transition-colors"
+              className="text-sm text-deep-100 hover:text-white font-medium transition-colors"
             >
               {t('officialWebsite')}
             </a>
-            <p className="text-xs text-deep-200">&copy; {new Date().getFullYear()} INSpark.Lab All rights reserved.</p>
+            <p className="text-xs text-deep-200 opacity-60">&copy; {new Date().getFullYear()} INSpark.Lab All rights reserved.</p>
           </div>
         </div>
       </footer>
@@ -463,6 +520,13 @@ function App() {
         onClose={() => setIsZoneModalOpen(false)}
         onSave={handleSaveZone}
         initialZone={editingZone}
+      />
+
+      {/* Toast Notifications */}
+      <Toast 
+        message={toast.message}
+        isVisible={toast.visible}
+        onClose={() => setToast({ ...toast, visible: false })}
       />
 
     </div>

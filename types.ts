@@ -12,6 +12,7 @@ export interface Article {
   url: string;
   imageUrl: string;
   publishedAt: string;
+  description?: string;
 }
 
 export interface ZoneSource {

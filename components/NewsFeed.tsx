@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { NewsZone, Article } from '../types';
 import { fetchZoneNews } from '../services/geminiService';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -13,11 +13,15 @@ interface NewsFeedProps {
   onUpdate: (id: string, data: Partial<NewsZone>) => void;
   onDelete: (id: string) => void;
   onEdit: (zone: NewsZone) => void;
+  onError: (message: string) => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
-const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit }) => {
+const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit, onError, isExpanded = false, onToggleExpand }) => {
   const { t } = useLanguage();
   const [articles, setArticles] = useState<Article[]>([]);
+  const justInRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -38,10 +42,12 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit })
         });
         setArticles(mapChunksToArticles(chunks));
       } catch (err) {
+        const errorMsg = t('errorFetch');
         onUpdate(zone.id, { 
-            error: t('errorFetch'), 
+            error: errorMsg, 
             isLoading: false 
         });
+        onError(errorMsg);
       }
     };
 
@@ -57,7 +63,21 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit })
   const featuredArticles = articles.slice(1, 5);
   
   // 3. Just In: The rest (vertical list)
-  const justInArticles = articles.slice(5);
+  // If expanded, show all remaining. If not, limit to next 6.
+  const justInArticles = isExpanded ? articles.slice(5) : articles.slice(5, 11);
+  
+  // Check if we have more articles than what fits in the standard 6 slots
+  const hasMoreArticles = articles.length > 11;
+
+  const handleToggle = () => {
+    if (onToggleExpand) {
+      onToggleExpand();
+      // If collapsing, scroll back to the top of the Just In section
+      if (isExpanded && justInRef.current) {
+        justInRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
 
   if (zone.isLoading && articles.length === 0) {
       return (
@@ -100,23 +120,31 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit })
             </div>
         </div>
         <div className="flex gap-2 items-center">
-             <button 
-                onClick={() => onEdit(zone)} 
-                className="text-xs text-deep-400 hover:text-deep-500 underline flex items-center gap-1"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
-                {t('editZone')}
-            </button>
-            <span className="text-deep-200">|</span>
+             {zone.id !== '1' && (
+               <>
+                 <button 
+                    onClick={() => onEdit(zone)} 
+                    className="text-xs text-deep-400 hover:text-deep-500 underline flex items-center gap-1"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                    </svg>
+                    {t('editZone')}
+                </button>
+                <span className="text-deep-200">|</span>
+               </>
+             )}
             <button onClick={() => onUpdate(zone.id, { articles: undefined })} className="text-xs text-deep-400 hover:text-deep-500 underline">
                 {t('refresh')}
             </button>
-            <span className="text-deep-200">|</span>
-            <button onClick={() => onDelete(zone.id)} className="text-xs text-red-400 hover:text-red-600 underline">
-                {t('deleteZone')}
-            </button>
+            {zone.id !== '1' && (
+              <>
+                <span className="text-deep-200">|</span>
+                <button onClick={() => onDelete(zone.id)} className="text-xs text-red-400 hover:text-red-600 underline">
+                    {t('deleteZone')}
+                </button>
+              </>
+            )}
         </div>
       </div>
 
@@ -143,7 +171,7 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit })
 
       {/* Tier 3: Just In (List of Rest) */}
       {justInArticles.length > 0 && (
-        <div>
+        <div ref={justInRef}>
           <h2 className="text-lg font-bold text-deep-500 border-b border-deep-200 pb-2 mb-6 uppercase tracking-wide">
             {t('justIn')}
           </h2>
@@ -152,6 +180,18 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit })
                <StandardArticleRow key={article.id} article={article} />
              ))}
           </div>
+
+          {/* Read More Button */}
+          {hasMoreArticles && onToggleExpand && (
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={handleToggle}
+                className="px-6 py-2 bg-deep-100 text-deep-400 font-medium rounded-full border border-deep-200 hover:bg-deep-200 hover:text-deep-500 transition-all shadow-sm"
+              >
+                {isExpanded ? t('showLess') : t('readMore')}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
