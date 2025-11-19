@@ -14,21 +14,31 @@ import { mapChunksToArticles } from './utils';
 
 // Initial Data
 const INITIAL_ZONES: NewsZone[] = [
-  { 
-    id: '1', 
-    title: 'Tech & AI', 
+  {
+    id: '1',
+    title: 'General',
     sources: [
-      { name: 'TechCrunch', url: 'https://techcrunch.com' },
-      { name: 'OpenAI', url: 'https://openai.com/blog' }
+      { name: 'INSPARK LAB', url: 'https://insparklab.com/feed/' },
+      { name: 'Crossing 換日線', url: 'https://crossing.cw.com.tw/rss' }
     ],
     isLoading: false
   },
-  { 
-    id: '2', 
-    title: 'Business', 
+  {
+    id: '2',
+    title: 'News & Current Affairs',
     sources: [
-      { name: 'Bloomberg', url: 'https://www.bloomberg.com' },
-      { name: 'WSJ', url: 'https://www.wsj.com' }
+      { name: 'BBC News 中文', url: 'https://feeds.bbci.co.uk/zhongwen/trad/rss.xml' },
+      { name: 'BBC (World)', url: 'https://feeds.bbci.co.uk/news/rss.xml' },
+      { name: 'The News Lens 關鍵評論網', url: 'https://feeds.feedburner.com/tnl-taiwan' }
+    ],
+    isLoading: false
+  },
+  {
+    id: '3',
+    title: 'Blockchain',
+    sources: [
+      { name: 'WEB 3+', url: 'https://web3plus.bnext.com.tw/rss' },
+      { name: 'PANews', url: 'https://rss.panewslab.com/zh/rss.xml' }
     ],
     isLoading: false
   }
