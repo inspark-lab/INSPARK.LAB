@@ -46,9 +46,10 @@ const findRssLinkFromHtml = async (url: string): Promise<string | null> => {
  * Fetches raw text content from a URL using multiple CORS proxies for reliability.
  * Strategy:
  * 1. Try AllOrigins (JSON mode) - Good for standard headers
- * 2. Fallback to CorsProxy.io (Raw mode) - Fast, usually reliable
- * 3. Fallback to CodeTabs (Raw mode) - Very reliable for redirects (FeedBurner)
- * 4. Fallback to ThingProxy (Raw mode) - Reliable backup
+ * 2. Try AllOrigins (Raw mode) - Good for bypassing JSON parsing errors
+ * 3. Fallback to CorsProxy.io (Raw mode) - Fast, usually reliable
+ * 4. Fallback to CodeTabs (Raw mode) - Very reliable for redirects (FeedBurner)
+ * 5. Fallback to ThingProxy (Raw mode) - Reliable backup
  */
 const fetchWithBackups = async (url: string): Promise<string | null> => {
   const timeout = 15000; // Increased to 15 seconds
@@ -75,7 +76,17 @@ const fetchWithBackups = async (url: string): Promise<string | null> => {
       if (data.contents) return data.contents;
     }
   } catch (err) {
-    // console.warn(`Primary proxy (AllOrigins) failed for ${url}`);
+    // console.warn(`Primary proxy (AllOrigins JSON) failed for ${url}`);
+  }
+
+  // Proxy 1.5: AllOrigins (Raw mode)
+  try {
+    const response = await fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+    if (response.ok) {
+      return await response.text();
+    }
+  } catch (err) {
+     // console.warn(`Secondary proxy (AllOrigins Raw) failed for ${url}`);
   }
 
   // Proxy 2: CorsProxy.io (Returns Raw Text)

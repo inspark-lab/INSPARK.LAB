@@ -18,7 +18,7 @@ export const translations = {
     trending: "Trending Now",
     justIn: "Just In",
     readMore: "Read More",
-    showLess: "Show Less",
+    loadMore: "Load More",
     featured: "Featured Story",
     
     // Zone Management (New)
@@ -37,6 +37,12 @@ export const translations = {
     cancel: "Cancel",
     createZone: "Create Topic",
     updateZone: "Update Topic",
+    
+    // Modal Modes
+    modeCreate: "Create New Topic",
+    modeAddExisting: "Add to Existing Topic",
+    selectTopic: "Select Topic",
+    addToTopic: "Add to Topic",
     
     // ZoneCard/Feed
     refresh: "Refresh",
@@ -66,6 +72,7 @@ export const translations = {
     // Footer
     footerSlogan: "Your minimalist news hub. Aggregate, organize, and focus on the stories that matter most.",
     officialWebsite: "Official Website: INSpark Lab",
+    contactUs: "Contact: insparklab@gmail.com",
 
     // Source Management Dashboard
     manageSourcesTitle: "Source Management Dashboard",
@@ -95,7 +102,7 @@ export const translations = {
     trending: "熱門趨勢",
     justIn: "最新快訊",
     readMore: "閱讀更多",
-    showLess: "收合",
+    loadMore: "載入更多",
     featured: "精選報導",
     
     // Zone Management (New)
@@ -114,6 +121,12 @@ export const translations = {
     cancel: "取消",
     createZone: "建立主題",
     updateZone: "更新主題",
+    
+    // Modal Modes
+    modeCreate: "建立新主題",
+    modeAddExisting: "加入現有主題",
+    selectTopic: "選擇主題",
+    addToTopic: "加入主題",
     
     // ZoneCard/Feed
     refresh: "重新整理",
@@ -143,6 +156,7 @@ export const translations = {
     // Footer
     footerSlogan: "您的極簡新聞中心。匯聚、整理並專注於最重要的故事。",
     officialWebsite: "官方網站：INSpark Lab",
+    contactUs: "有問題請聯絡：insparklab@gmail.com",
 
     // Source Management Dashboard
     manageSourcesTitle: "來源管理儀表板",

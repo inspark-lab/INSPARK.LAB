@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NewsZone, Article } from '../types';
 import { fetchZoneNews } from '../services/geminiService';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -14,14 +14,21 @@ interface NewsFeedProps {
   onDelete: (id: string) => void;
   onEdit: (zone: NewsZone) => void;
   onError: (message: string) => void;
-  isExpanded?: boolean;
-  onToggleExpand?: () => void;
+  currentLoadCount: number;
+  onLoadMore: () => void;
 }
 
-const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit, onError, isExpanded = false, onToggleExpand }) => {
+const NewsFeed: React.FC<NewsFeedProps> = ({ 
+  zone, 
+  onUpdate, 
+  onDelete, 
+  onEdit, 
+  onError, 
+  currentLoadCount, 
+  onLoadMore 
+}) => {
   const { t } = useLanguage();
   const [articles, setArticles] = useState<Article[]>([]);
-  const justInRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -63,21 +70,11 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit, o
   const featuredArticles = articles.slice(1, 5);
   
   // 3. Just In: The rest (vertical list)
-  // If expanded, show all remaining. If not, limit to next 6.
-  const justInArticles = isExpanded ? articles.slice(5) : articles.slice(5, 11);
+  // Starts at index 5. Shows 'currentLoadCount' items (default 6).
+  const justInArticles = articles.slice(5, 5 + currentLoadCount);
   
-  // Check if we have more articles than what fits in the standard 6 slots
-  const hasMoreArticles = articles.length > 11;
-
-  const handleToggle = () => {
-    if (onToggleExpand) {
-      onToggleExpand();
-      // If collapsing, scroll back to the top of the Just In section
-      if (isExpanded && justInRef.current) {
-        justInRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }
-  };
+  // Check if we have more articles than what is currently shown
+  const hasMoreArticles = articles.length > (5 + currentLoadCount);
 
   if (zone.isLoading && articles.length === 0) {
       return (
@@ -113,7 +110,15 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit, o
             <h1 className="text-3xl font-bold text-deep-500">{zone.title}</h1>
             <div className="mt-1 flex flex-wrap gap-2">
                 {zone.sources.map((s, i) => (
-                     <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="inline-block bg-deep-100 text-deep-400 text-xs px-2 py-0.5 rounded-full border border-deep-200 hover:bg-deep-200 hover:text-deep-500 transition-colors" title={s.url}>
+                     <a 
+                       key={i} 
+                       href={s.url} 
+                       target="_blank" 
+                       rel="noopener noreferrer" 
+                       className="inline-block bg-deep-100 text-deep-400 text-xs px-2 py-0.5 rounded-full border border-deep-200 hover:bg-deep-200 hover:text-deep-500 hover:shadow-sm transition-all cursor-pointer" 
+                       title={s.url}
+                       onClick={(e) => e.stopPropagation()}
+                     >
                         {s.name}
                     </a>
                 ))}
@@ -163,7 +168,7 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit, o
 
       {/* Tier 3: Just In (List of Rest) */}
       {justInArticles.length > 0 && (
-        <div ref={justInRef}>
+        <div>
           <h2 className="text-lg font-bold text-deep-500 border-b border-deep-200 pb-2 mb-6 uppercase tracking-wide">
             {t('justIn')}
           </h2>
@@ -173,14 +178,14 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ zone, onUpdate, onDelete, onEdit, o
              ))}
           </div>
 
-          {/* Read More Button */}
-          {hasMoreArticles && onToggleExpand && (
+          {/* Load More Button */}
+          {hasMoreArticles && (
             <div className="mt-6 flex justify-center">
               <button
-                onClick={handleToggle}
+                onClick={onLoadMore}
                 className="px-6 py-2 bg-deep-100 text-deep-400 font-medium rounded-full border border-deep-200 hover:bg-deep-200 hover:text-deep-500 transition-all shadow-sm"
               >
-                {isExpanded ? t('showLess') : t('readMore')}
+                {t('loadMore')}
               </button>
             </div>
           )}

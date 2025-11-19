@@ -7,14 +7,19 @@ import { useLanguage } from '../contexts/LanguageContext';
 interface ZoneEditModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (title: string, sources: ZoneSource[]) => void;
+  onSave: (title: string, sources: ZoneSource[], targetZoneId?: string) => void;
   initialZone?: NewsZone | null;
+  zones: NewsZone[];
 }
 
-const ZoneEditModal: React.FC<ZoneEditModalProps> = ({ isOpen, onClose, onSave, initialZone }) => {
+const ZoneEditModal: React.FC<ZoneEditModalProps> = ({ isOpen, onClose, onSave, initialZone, zones }) => {
   const { t } = useLanguage();
-  const [title, setTitle] = useState('');
   
+  // State for Mode Selection (only active when creating/adding, not editing)
+  const [mode, setMode] = useState<'create' | 'existing'>('create');
+  const [targetZoneId, setTargetZoneId] = useState('');
+  
+  const [title, setTitle] = useState('');
   const [nameInput, setNameInput] = useState('');
   const [urlInput, setUrlInput] = useState('');
   const [sources, setSources] = useState<ZoneSource[]>([]);
@@ -23,16 +28,22 @@ const ZoneEditModal: React.FC<ZoneEditModalProps> = ({ isOpen, onClose, onSave, 
   useEffect(() => {
     if (isOpen) {
       if (initialZone) {
+        // Editing Mode
+        setMode('create'); // Effectively standard edit
         setTitle(initialZone.title);
         setSources([...initialZone.sources]);
+        setTargetZoneId('');
       } else {
+        // Adding Mode (Reset defaults)
+        setMode('create');
         setTitle('');
         setSources([]);
+        setTargetZoneId(zones.length > 0 ? zones[0].id : '');
       }
       setNameInput('');
       setUrlInput('');
     }
-  }, [isOpen, initialZone]);
+  }, [isOpen, initialZone, zones]);
 
   const handleAddSource = () => {
     if (nameInput.trim() && urlInput.trim()) {
@@ -47,30 +58,85 @@ const ZoneEditModal: React.FC<ZoneEditModalProps> = ({ isOpen, onClose, onSave, 
   };
 
   const handleSave = () => {
-    if (title && sources.length > 0) {
-      onSave(title, sources);
-      onClose();
+    if (mode === 'create') {
+      if (title && sources.length > 0) {
+        onSave(title, sources);
+        onClose();
+      }
+    } else {
+      // Existing mode
+      if (targetZoneId && sources.length > 0) {
+        onSave('', sources, targetZoneId);
+        onClose();
+      }
     }
   };
+
+  const isEditMode = !!initialZone;
+
+  // Dynamic Button Text
+  let saveButtonText = t('createZone');
+  if (isEditMode) saveButtonText = t('updateZone');
+  else if (mode === 'existing') saveButtonText = t('addToTopic');
+
+  // Validation
+  const isValid = 
+    sources.length > 0 && 
+    (mode === 'create' ? !!title : !!targetZoneId);
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={initialZone ? t('editZoneTitle') : t('addZoneTitle')}
+      title={isEditMode ? t('editZoneTitle') : t('addZoneTitle')}
     >
       <div className="space-y-6">
         
-        {/* Title Input */}
+        {/* Mode Selector (Only show if NOT editing an existing zone) */}
+        {!isEditMode && zones.length > 0 && (
+          <div className="flex p-1 bg-deep-100 rounded-lg border border-deep-200">
+             <button
+               onClick={() => setMode('create')}
+               className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${mode === 'create' ? 'bg-deep-500 text-white shadow-sm' : 'text-deep-400 hover:text-deep-500'}`}
+             >
+               {t('modeCreate')}
+             </button>
+             <button
+               onClick={() => setMode('existing')}
+               className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${mode === 'existing' ? 'bg-deep-500 text-white shadow-sm' : 'text-deep-400 hover:text-deep-500'}`}
+             >
+               {t('modeAddExisting')}
+             </button>
+          </div>
+        )}
+
+        {/* Topic Selection or Creation */}
         <div>
-          <label className="block text-sm font-medium text-deep-400 mb-1">{t('zoneTitleLabel')}</label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={t('zoneTitlePlaceholder')}
-            className="block w-full border border-deep-200 bg-deep-100 rounded-md shadow-sm py-2 px-3 text-deep-500 placeholder-deep-300 focus:outline-none focus:ring-deep-400 focus:border-deep-400 sm:text-sm transition-colors"
-          />
+          {mode === 'create' ? (
+             <>
+                <label className="block text-sm font-medium text-deep-400 mb-1">{t('zoneTitleLabel')}</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={t('zoneTitlePlaceholder')}
+                  className="block w-full border border-deep-200 bg-deep-100 rounded-md shadow-sm py-2 px-3 text-deep-500 placeholder-deep-300 focus:outline-none focus:ring-deep-400 focus:border-deep-400 sm:text-sm transition-colors"
+                />
+             </>
+          ) : (
+             <>
+                <label className="block text-sm font-medium text-deep-400 mb-1">{t('selectTopic')}</label>
+                <select
+                  value={targetZoneId}
+                  onChange={(e) => setTargetZoneId(e.target.value)}
+                  className="block w-full border border-deep-200 bg-deep-100 rounded-md shadow-sm py-2 px-3 text-deep-500 focus:outline-none focus:ring-deep-400 focus:border-deep-400 sm:text-sm transition-colors cursor-pointer"
+                >
+                   {zones.map(z => (
+                     <option key={z.id} value={z.id}>{z.title}</option>
+                   ))}
+                </select>
+             </>
+          )}
         </div>
 
         {/* Source Management */}
@@ -147,10 +213,10 @@ const ZoneEditModal: React.FC<ZoneEditModalProps> = ({ isOpen, onClose, onSave, 
           </button>
           <button
             onClick={handleSave}
-            disabled={!title || sources.length === 0}
+            disabled={!isValid}
             className="px-4 py-2 bg-deep-400 text-deep-100 rounded-md text-sm font-medium hover:bg-deep-500 disabled:opacity-50 transition-colors"
           >
-            {initialZone ? t('updateZone') : t('createZone')}
+            {saveButtonText}
           </button>
         </div>
       </div>

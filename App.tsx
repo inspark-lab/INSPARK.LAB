@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { NewsZone, NotificationSettings, ZoneSource, Article } from './types';
+import { NewsZone, ZoneSource, Article } from './types';
 import NavigationSidebar from './components/NavigationSidebar';
 import NewsFeed from './components/NewsFeed';
-import SettingsDrawer from './components/SettingsDrawer';
 import ZoneEditModal from './components/ZoneEditModal';
 import SourceManagementDashboard from './components/SourceManagementDashboard';
 import HeroCarousel from './components/HeroCarousel';
@@ -17,31 +16,42 @@ import Toast from './components/Toast';
 // Initial Data
 const INITIAL_ZONES: NewsZone[] = [
   {
-    id: '2',
+    id: '1',
     title: 'News & Current Affairs',
     sources: [
-      { name: 'INSPARK LAB', url: 'https://insparklab.com/feed/' },
       { name: 'BBC News 中文', url: 'https://feeds.bbci.co.uk/zhongwen/trad/rss.xml' },
-      { name: 'BBC (World)', url: 'https://feeds.bbci.co.uk/news/rss.xml' }
+      { name: 'BBC (World)', url: 'http://feeds.bbci.co.uk/news/rss.xml' },
+      // Using Google News RSS as a stable proxy for CNA and Focus Taiwan to avoid WAF/CORS blocks
+      { name: 'CNA 中央社 (TW)', url: 'https://news.google.com/rss/search?q=site:cna.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant' }, 
+      { name: 'Focus Taiwan (EN)', url: 'https://news.google.com/rss/search?q=site:focustaiwan.tw&hl=en-US&gl=US&ceid=US:en' }, 
+      { name: 'Google News (TW)', url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=zh-TW' },
+      { name: 'CNN', url: 'http://rss.cnn.com/rss/edition.rss' },
+    ],
+    isLoading: false
+  },
+  {
+    id: '2',
+    title: 'Blockchain',
+    sources: [
+      { name: 'WEB 3+', url: 'https://web3plus.bnext.com.tw/rss' },
+      { name: 'PANews', url: 'https://rss.panewslab.com/zh/rss.xml' },
+      { name: '鏈新聞', url: 'https://abmedia.io/feed' },
+      { name: '區塊客', url: 'https://blockcast.it/feed/' },
+      { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' } 
     ],
     isLoading: false
   },
   {
     id: '3',
-    title: 'Blockchain',
+    title: 'Marketing / Life style',
     sources: [
-      { name: 'WEB 3+', url: 'https://web3plus.bnext.com.tw/rss' },
-      { name: 'PANews', url: 'https://rss.panewslab.com/zh/rss.xml' }
+      { name: 'INSPARK LAB', url: 'https://insparklab.com/feed/' },
+      { name: 'Marketing Dive', url: 'https://www.marketingdive.com/feeds/news/' }, 
+      { name: 'The Ahrefs Blog', url: 'https://ahrefs.com/blog/feed/' }
     ],
     isLoading: false
   }
 ];
-
-const INITIAL_SETTINGS: NotificationSettings = {
-  enabled: false,
-  email: '',
-  time: '08:00'
-};
 
 function App() {
   const { t, language, setLanguage } = useLanguage();
@@ -49,8 +59,6 @@ function App() {
   // State
   const [zones, setZones] = useState<NewsZone[]>([]);
   const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
-  const [settings, setSettings] = useState<NotificationSettings>(INITIAL_SETTINGS);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   // Mobile Menu State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -65,8 +73,9 @@ function App() {
   // Toast State
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
 
-  // Expansion State (for Read More)
-  const [expandedTopics, setExpandedTopics] = useState<string[]>([]);
+  // Incremental Loading State: Maps TopicID -> Loaded Count (default 6)
+  // Key 'all-news' is used for the Home page Just In section
+  const [topicLoadCounts, setTopicLoadCounts] = useState<Record<string, number>>({});
 
   // Ref to disable scroll spy temporarily during click scrolling
   const isClickScrolling = useRef(false);
@@ -75,12 +84,13 @@ function App() {
   // Load Data
   useEffect(() => {
     const storedZones = localStorage.getItem('nexus_zones');
-    const storedSettings = localStorage.getItem('nexus_settings');
     
     if (storedZones) {
       try {
         let parsedZones = JSON.parse(storedZones);
-        // Migration: If zones have 'queries' but not 'sources', map them
+        
+        // --- MIGRATION LOGIC ---
+        // 1. Map old 'queries' to 'sources'
         parsedZones = parsedZones.map((z: any) => {
           if (!z.sources && z.queries) {
             return {
@@ -90,6 +100,29 @@ function App() {
           }
           return z;
         });
+
+        // 2. Source Replacement (Detecting old/broken sources and upgrading them)
+        const REPLACEMENTS: Record<string, { name: string, url: string }> = {
+           // Replacements for previously broken sources
+           'Taiwan News (ZH)': { name: 'CNA 中央社 (TW)', url: 'https://news.google.com/rss/search?q=site:cna.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant' },
+           'Taiwan News (EN)': { name: 'Focus Taiwan (EN)', url: 'https://news.google.com/rss/search?q=site:focustaiwan.tw&hl=en-US&gl=US&ceid=US:en' },
+           'CNA 中央社 (TW)': { name: 'CNA 中央社 (TW)', url: 'https://news.google.com/rss/search?q=site:cna.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant' },
+           'Focus Taiwan (EN)': { name: 'Focus Taiwan (EN)', url: 'https://news.google.com/rss/search?q=site:focustaiwan.tw&hl=en-US&gl=US&ceid=US:en' },
+           'Coingecko': { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' },
+           'Marketing Brew': { name: 'Marketing Dive', url: 'https://www.marketingdive.com/feeds/news/' }
+        };
+
+        parsedZones = parsedZones.map((z: NewsZone) => ({
+           ...z,
+           sources: z.sources.map(s => {
+              // Check if this source needs replacement by name
+              if (REPLACEMENTS[s.name]) {
+                 return REPLACEMENTS[s.name];
+              }
+              return s;
+           })
+        }));
+
         setZones(parsedZones);
         if (parsedZones.length > 0) setActiveZoneId(null); // Default to Home/All News on load
       } catch (e) {
@@ -102,25 +135,12 @@ function App() {
       setActiveZoneId(null);
     }
 
-    if (storedSettings) {
-      const parsed = JSON.parse(storedSettings);
-      const migratedSettings: NotificationSettings = {
-        enabled: parsed.enabled ?? false,
-        email: parsed.email ?? '',
-        time: parsed.time ?? '08:00'
-      };
-      setSettings(migratedSettings);
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     localStorage.setItem('nexus_zones', JSON.stringify(zones));
   }, [zones]);
-
-  useEffect(() => {
-    localStorage.setItem('nexus_settings', JSON.stringify(settings));
-  }, [settings]);
 
   // Scroll Spy Logic
   useEffect(() => {
@@ -218,9 +238,9 @@ function App() {
     setIsMobileMenuOpen(false);
   };
 
-  const handleSaveZone = (title: string, sources: ZoneSource[]) => {
+  const handleSaveZone = (title: string, sources: ZoneSource[], targetZoneId?: string) => {
     if (editingZone) {
-      // Update Existing
+      // Update Existing via Edit Mode
       setZones(prev => prev.map(z => z.id === editingZone.id ? {
         ...z,
         title,
@@ -228,8 +248,29 @@ function App() {
         // Invalidate cache if sources change
         articles: JSON.stringify(z.sources) !== JSON.stringify(sources) ? undefined : z.articles
       } : z));
+    } else if (targetZoneId) {
+      // Add Sources to Existing Topic (from "Add Topic" modal)
+      setZones(prev => prev.map(z => {
+        if (z.id === targetZoneId) {
+            // Avoid duplicates
+            const existingUrls = new Set(z.sources.map(s => s.url));
+            const newUniqueSources = sources.filter(s => !existingUrls.has(s.url));
+            
+            if (newUniqueSources.length === 0) return z;
+
+            return {
+                ...z,
+                sources: [...z.sources, ...newUniqueSources],
+                articles: undefined // Invalidate cache
+            };
+        }
+        return z;
+      }));
+      // Scroll to that zone
+      setTimeout(() => scrollToZone(targetZoneId), 100);
+
     } else {
-      // Create New
+      // Create New Topic
       const newZone: NewsZone = {
         id: uuidv4(),
         title,
@@ -297,17 +338,12 @@ function App() {
   const showToast = (message: string) => {
     setToast({ message, visible: true });
   };
-
-  const toggleTopicExpansion = (id: string) => {
-    setExpandedTopics(prev => {
-      const isExpanded = prev.includes(id);
-      // If collapsing and it's the all-news section, scroll to top of its Just In section
-      if (isExpanded && id === 'all-news' && allNewsJustInRef.current) {
-        allNewsJustInRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-      
-      return isExpanded ? prev.filter(tid => tid !== id) : [...prev, id];
-    });
+  
+  const handleLoadMore = (topicId: string) => {
+    setTopicLoadCounts(prev => ({
+      ...prev,
+      [topicId]: (prev[topicId] || 6) + 6
+    }));
   };
 
   // Aggregation Logic for "All News" Section
@@ -377,14 +413,14 @@ function App() {
     return finalArticles;
   }, [zones]); 
   
-  // 3-Tier Slicing
+  // 3-Tier Slicing for All News
   const heroArticles = allArticles.slice(0, 6); // Tier 1: Top 6
   const featuredArticles = allArticles.slice(6, 10); // Tier 2: Next 4
   
-  // Tier 3: Check expansion
-  const isAllNewsExpanded = expandedTopics.includes('all-news');
-  const standardArticles = isAllNewsExpanded ? allArticles.slice(10) : allArticles.slice(10, 16);
-  const hasMoreAllNews = allArticles.length > 16;
+  // Tier 3: Home Incremental Load
+  const allNewsLoadCount = topicLoadCounts['all-news'] || 6;
+  const standardArticles = allArticles.slice(10, 10 + allNewsLoadCount);
+  const hasMoreAllNews = allArticles.length > (10 + allNewsLoadCount);
 
   return (
     <div className="min-h-screen bg-deep-100 text-deep-500 font-sans flex flex-col">
@@ -417,10 +453,6 @@ function App() {
                 activeZoneId={activeZoneId}
                 onSelectZone={scrollToZone}
                 onAddZone={handleOpenAddZone}
-                onOpenSettings={() => {
-                  setIsSettingsOpen(true);
-                  setIsMobileMenuOpen(false);
-                }}
                 onEditZone={handleOpenEditZone}
                 onReorderZones={handleReorderZones}
                 onOpenSourceManager={() => {
@@ -478,7 +510,6 @@ function App() {
               activeZoneId={activeZoneId}
               onSelectZone={scrollToZone}
               onAddZone={handleOpenAddZone}
-              onOpenSettings={() => setIsSettingsOpen(true)}
               onEditZone={handleOpenEditZone}
               onReorderZones={handleReorderZones}
               onOpenSourceManager={() => setIsSourceManagerOpen(true)}
@@ -524,14 +555,14 @@ function App() {
                       ))}
                     </div>
                     
-                    {/* Read More Button for All News */}
+                    {/* Load More Button for All News */}
                     {hasMoreAllNews && (
                       <div className="mt-6 flex justify-center">
                         <button
-                          onClick={() => toggleTopicExpansion('all-news')}
+                          onClick={() => handleLoadMore('all-news')}
                           className="px-6 py-2 bg-deep-100 text-deep-400 font-medium rounded-full border border-deep-200 hover:bg-deep-200 hover:text-deep-500 transition-all shadow-sm"
                         >
-                          {isAllNewsExpanded ? t('showLess') : t('readMore')}
+                          {t('loadMore')}
                         </button>
                       </div>
                     )}
@@ -554,8 +585,8 @@ function App() {
                        onDelete={deleteZone}
                        onEdit={handleOpenEditZone}
                        onError={showToast}
-                       isExpanded={expandedTopics.includes(zone.id)}
-                       onToggleExpand={() => toggleTopicExpansion(zone.id)}
+                       currentLoadCount={topicLoadCounts[zone.id] || 6}
+                       onLoadMore={() => handleLoadMore(zone.id)}
                      />
                    </div>
                  ))}
@@ -593,21 +624,13 @@ function App() {
         </div>
       </footer>
 
-      {/* Settings Drawer */}
-      <SettingsDrawer 
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        onSaveSettings={setSettings}
-        zones={zones}
-      />
-
       {/* Zone Edit Modal */}
       <ZoneEditModal
         isOpen={isZoneModalOpen}
         onClose={() => setIsZoneModalOpen(false)}
         onSave={handleSaveZone}
         initialZone={editingZone}
+        zones={zones}
       />
 
       {/* Source Management Dashboard */}

@@ -92,21 +92,24 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ isOpen, onClose, settin
 
             {/* Branding Section (Moved to bottom) */}
             <div className="mt-auto pt-8">
-               <div className="bg-deep-500 rounded-lg p-5 shadow-md border border-deep-400">
-                  <p className="text-xs text-deep-200 italic mb-4 font-light leading-relaxed">
+               <div className="bg-deep-500 rounded-lg p-5 shadow-lg border border-deep-400">
+                  <p className="text-xs text-white italic mb-4 font-light leading-relaxed">
                     {t('footerSlogan')}
                   </p>
                   <a 
                     href="https://insparklab.com" 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="text-sm font-medium text-deep-100 hover:text-white transition-colors flex items-center gap-2"
+                    className="text-sm font-bold text-white hover:text-deep-100 transition-colors flex items-center gap-2"
                   >
                     {t('officialWebsite')}
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-deep-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                   </a>
+                  <p className="text-xs text-deep-200 mt-4 pt-4 border-t border-deep-400/50">
+                    {t('contactUs')}
+                  </p>
                </div>
             </div>
 
