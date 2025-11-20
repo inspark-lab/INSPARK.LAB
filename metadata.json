@@ -1,5 +1,5 @@
 {
-  "name": "Nexus News Aggregator",
+  "name": "Daily News Aggregator",
   "description": "A minimalist, AI-powered news aggregator that organizes the web into clean, white zones. Features customizable feeds, smart scheduling, and automated summarization.",
   "requestFramePermissions": []
 }
