@@ -112,11 +112,11 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
                 {zone.sources.map((s, i) => (
                      <a 
                        key={i} 
-                       href={s.url} 
+                       href={s.homepage || (s.url.startsWith('http') ? new URL(s.url).origin : s.url)} 
                        target="_blank" 
                        rel="noopener noreferrer" 
                        className="inline-block bg-deep-100 text-deep-400 text-xs px-2 py-0.5 rounded-full border border-deep-200 hover:bg-deep-200 hover:text-deep-500 hover:shadow-sm transition-all cursor-pointer" 
-                       title={s.url}
+                       title={s.homepage || s.url}
                        onClick={(e) => e.stopPropagation()}
                      >
                         {s.name}

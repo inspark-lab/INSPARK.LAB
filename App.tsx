@@ -19,13 +19,13 @@ const INITIAL_ZONES: NewsZone[] = [
     id: '1',
     title: 'News & Current Affairs',
     sources: [
-      { name: 'BBC News 中文', url: 'https://feeds.bbci.co.uk/zhongwen/trad/rss.xml' },
-      { name: 'BBC (World)', url: 'http://feeds.bbci.co.uk/news/rss.xml' },
+      { name: 'BBC News 中文', url: 'https://feeds.bbci.co.uk/zhongwen/trad/rss.xml', homepage: 'https://www.bbc.com/zhongwen/trad' },
+      { name: 'BBC (World)', url: 'http://feeds.bbci.co.uk/news/rss.xml', homepage: 'https://www.bbc.com/news' },
       // Using Google News RSS as a stable proxy for CNA and Focus Taiwan to avoid WAF/CORS blocks
-      { name: 'CNA 中央社 (TW)', url: 'https://news.google.com/rss/search?q=site:cna.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant' }, 
-      { name: 'Focus Taiwan (EN)', url: 'https://news.google.com/rss/search?q=site:focustaiwan.tw&hl=en-US&gl=US&ceid=US:en' }, 
-      { name: 'Google News (TW)', url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=zh-TW' },
-      { name: 'CNN', url: 'http://rss.cnn.com/rss/edition.rss' },
+      { name: 'CNA 中央社 (TW)', url: 'https://news.google.com/rss/search?q=site:cna.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant', homepage: 'https://www.cna.com.tw/' }, 
+      { name: 'Focus Taiwan (EN)', url: 'https://news.google.com/rss/search?q=site:focustaiwan.tw&hl=en-US&gl=US&ceid=US:en', homepage: 'https://focustaiwan.tw/' }, 
+      { name: 'Google News (TW)', url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=zh-TW', homepage: 'https://news.google.com/' },
+      { name: 'CNN', url: 'http://rss.cnn.com/rss/edition.rss', homepage: 'https://edition.cnn.com/' },
     ],
     isLoading: false
   },
@@ -33,11 +33,11 @@ const INITIAL_ZONES: NewsZone[] = [
     id: '2',
     title: 'Blockchain',
     sources: [
-      { name: 'WEB 3+', url: 'https://web3plus.bnext.com.tw/rss' },
-      { name: 'PANews', url: 'https://rss.panewslab.com/zh/rss.xml' },
-      { name: '鏈新聞', url: 'https://abmedia.io/feed' },
-      { name: '區塊客', url: 'https://news.google.com/rss/search?q=site:blockcast.it&hl=zh-TW&gl=TW&ceid=TW:zh-Hant' }, // Switched to Google News Proxy
-      { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' } 
+      { name: 'WEB 3+', url: 'https://web3plus.bnext.com.tw/rss', homepage: 'https://web3plus.bnext.com.tw/' },
+      { name: 'PANews', url: 'https://rss.panewslab.com/zh/rss.xml', homepage: 'https://www.panewslab.com/zh-hant' },
+      { name: '鏈新聞', url: 'https://abmedia.io/feed', homepage: 'https://abmedia.io/' },
+      { name: '區塊客', url: 'https://blockcast.it/feed/', homepage: 'https://blockcast.it/' },
+      { name: 'Coingecko', url: 'https://www.coingecko.com/news/feed', homepage: 'https://www.coingecko.com/' }
     ],
     isLoading: false
   },
@@ -45,8 +45,8 @@ const INITIAL_ZONES: NewsZone[] = [
     id: '3',
     title: 'Marketing / Life style',
     sources: [
-      { name: 'INSPARK LAB', url: 'https://insparklab.com/feed/' },
-      { name: 'The Ahrefs Blog', url: 'https://ahrefs.com/blog/feed/' }
+      { name: 'INSPARK LAB', url: 'https://insparklab.com/feed/', homepage: 'https://insparklab.com/' },
+      { name: 'The Ahrefs Blog', url: 'https://ahrefs.com/blog/feed/', homepage: 'https://ahrefs.com/blog/' }
     ],
     isLoading: false
   }
@@ -94,23 +94,23 @@ function App() {
           if (!z.sources && z.queries) {
             return {
               ...z,
-              sources: z.queries.map((q: string) => ({ name: q, url: '' }))
+              sources: z.queries.map((q: string) => ({ name: q, url: '', homepage: '' }))
             };
           }
           return z;
         });
 
         // 2. Source Replacement (Detecting old/broken sources and upgrading them)
-        const REPLACEMENTS: Record<string, { name: string, url: string }> = {
+        const REPLACEMENTS: Record<string, { name: string, url: string, homepage?: string }> = {
            // Replacements for previously broken sources
-           'Taiwan News (ZH)': { name: 'CNA 中央社 (TW)', url: 'https://news.google.com/rss/search?q=site:cna.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant' },
-           'Taiwan News (EN)': { name: 'Focus Taiwan (EN)', url: 'https://news.google.com/rss/search?q=site:focustaiwan.tw&hl=en-US&gl=US&ceid=US:en' },
-           'CNA 中央社 (TW)': { name: 'CNA 中央社 (TW)', url: 'https://news.google.com/rss/search?q=site:cna.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant' },
-           'Focus Taiwan (EN)': { name: 'Focus Taiwan (EN)', url: 'https://news.google.com/rss/search?q=site:focustaiwan.tw&hl=en-US&gl=US&ceid=US:en' },
-           'Coingecko': { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' },
-           'Marketing Brew': { name: 'The Ahrefs Blog', url: 'https://ahrefs.com/blog/feed/' }, // Migrate away from Marketing Brew/Dive
-           'Marketing Dive': { name: 'The Ahrefs Blog', url: 'https://ahrefs.com/blog/feed/' }, // Also catch Dive if previously migrated
-           '區塊客': { name: '區塊客', url: 'https://news.google.com/rss/search?q=site:blockcast.it&hl=zh-TW&gl=TW&ceid=TW:zh-Hant' }
+           'Taiwan News (ZH)': { name: 'CNA 中央社 (TW)', url: 'https://news.google.com/rss/search?q=site:cna.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant', homepage: 'https://www.cna.com.tw/' },
+           'Taiwan News (EN)': { name: 'Focus Taiwan (EN)', url: 'https://news.google.com/rss/search?q=site:focustaiwan.tw&hl=en-US&gl=US&ceid=US:en', homepage: 'https://focustaiwan.tw/' },
+           'CNA 中央社 (TW)': { name: 'CNA 中央社 (TW)', url: 'https://news.google.com/rss/search?q=site:cna.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant', homepage: 'https://www.cna.com.tw/' },
+           'Focus Taiwan (EN)': { name: 'Focus Taiwan (EN)', url: 'https://news.google.com/rss/search?q=site:focustaiwan.tw&hl=en-US&gl=US&ceid=US:en', homepage: 'https://focustaiwan.tw/' },
+           'Coingecko': { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', homepage: 'https://www.coindesk.com/' },
+           'Marketing Brew': { name: 'The Ahrefs Blog', url: 'https://ahrefs.com/blog/feed/', homepage: 'https://ahrefs.com/blog/' }, // Migrate away from Marketing Brew/Dive
+           'Marketing Dive': { name: 'The Ahrefs Blog', url: 'https://ahrefs.com/blog/feed/', homepage: 'https://ahrefs.com/blog/' }, // Also catch Dive if previously migrated
+           '區塊客': { name: '區塊客', url: 'https://news.google.com/rss/search?q=site:blockcast.it&hl=zh-TW&gl=TW&ceid=TW:zh-Hant', homepage: 'https://blockcast.it/' }
         };
 
         parsedZones = parsedZones.map((z: NewsZone) => ({
@@ -240,14 +240,29 @@ function App() {
   };
 
   const handleSaveZone = (title: string, sources: ZoneSource[], targetZoneId?: string) => {
+    // Automatically generate homepage from URL origin if not present
+    const processedSources = sources.map(s => {
+        if (s.homepage) return s;
+        try {
+            // Basic check to ensure URL is valid before parsing
+            if (s.url.startsWith('http')) {
+               const urlObj = new URL(s.url);
+               return { ...s, homepage: urlObj.origin };
+            }
+            return { ...s, homepage: s.url };
+        } catch (e) {
+            return { ...s, homepage: s.url };
+        }
+    });
+
     if (editingZone) {
       // Update Existing via Edit Mode
       setZones(prev => prev.map(z => z.id === editingZone.id ? {
         ...z,
         title,
-        sources,
+        sources: processedSources,
         // Invalidate cache if sources change
-        articles: JSON.stringify(z.sources) !== JSON.stringify(sources) ? undefined : z.articles
+        articles: JSON.stringify(z.sources) !== JSON.stringify(processedSources) ? undefined : z.articles
       } : z));
     } else if (targetZoneId) {
       // Add Sources to Existing Topic (from "Add Topic" modal)
@@ -255,7 +270,7 @@ function App() {
         if (z.id === targetZoneId) {
             // Avoid duplicates
             const existingUrls = new Set(z.sources.map(s => s.url));
-            const newUniqueSources = sources.filter(s => !existingUrls.has(s.url));
+            const newUniqueSources = processedSources.filter(s => !existingUrls.has(s.url));
             
             if (newUniqueSources.length === 0) return z;
 
@@ -275,7 +290,7 @@ function App() {
       const newZone: NewsZone = {
         id: uuidv4(),
         title,
-        sources,
+        sources: processedSources,
         isLoading: false
       };
       const newZones = [...zones, newZone];

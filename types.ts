@@ -18,6 +18,7 @@ export interface Article {
 export interface ZoneSource {
   name: string;
   url: string;
+  homepage?: string;
 }
 
 // Derived from Gemini GroundingMetadata structure
